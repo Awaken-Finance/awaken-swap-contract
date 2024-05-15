@@ -27,20 +27,73 @@ namespace Awaken.Contracts.Swap
 
         private string[] SortSymbols(params string[] symbols)
         {
-            Assert(symbols.Length == 2, "Invalid symbols for sorting.");
+            Assert(
+                symbols.Length == 2 && !symbols.First().All(IsValidItemIdChar) &&
+                !symbols.Last().All(IsValidItemIdChar), "Invalid symbols for sorting.");
             return symbols.OrderBy(s => s).ToArray();
+        }
+
+        /// <summary>
+        /// Two cases,ex: 1.AAA-1-ELF 2.ELF-AAA-1
+        /// If the middle position is a number, the first two digits form the symbol of the NFT.
+        /// If not, the last two digits form the symbol of the NFT.
+        /// For example, if the given list is ["AAA","1","ELF"], the first two digits form the nft symbol（"AAA-1"）, the last digits form the ft symbol ("ELF"),
+        /// if the given list is ["ELF","AAA","1"], the first digits form the ft symbol("ELF"), the last two digits form the nft symbol ("AAA-1").
+        /// </summary>
+        /// <param name="symbols"></param>
+        /// <returns></returns>
+        private string[] GetAndSortSymbol(params string[] symbols)
+        {
+            var symbolA = symbols[1].All(IsValidItemIdChar)
+                ? $"{symbols[0]}-{symbols[1]}"
+                : $"{symbols[1]}-{symbols[2]}";
+            var symbolB = symbols[1].All(IsValidItemIdChar) ? symbols[2] : symbols[0];
+            return SortSymbols(symbolA, symbolB);
+        }
+
+        /// <summary>
+        /// Ex: ABC-1-DEF-1
+        /// The first two digits and the last two digits respectively form the symbol of the NFT.
+        /// For example, if the given list is ["ABC","1","DEF","1"], the first nft symbol is "ABC-1", the second nft symbol is "DEF-1".
+        /// </summary>
+        /// <param name="symbols"></param>
+        /// <returns></returns>
+        private string[] GetAndSortNftSymbol(params string[] symbols)
+        {
+            var symbolA = $"{symbols[0]}-{symbols[1]}";
+            var symbolB = $"{symbols[2]}-{symbols[3]}";
+            return SortSymbols(symbolA, symbolB);
         }
 
         /// <summary>
         /// Extract "ABC" & "DEF" from "ABC-DEF",
         /// and ranked.
+        /// support "ABC-DEF" & "ABC-DEF-1" & "ABC-1-DEF" & "ABC-1-DEF-1"
+        /// rank "AAA-1-ELF","AAA-1-AAA-2","ELF-GGG-1"
         /// </summary>
         /// <param name="tokenPair"></param>
         /// <returns></returns>
         private string[] ExtractTokenPair(string tokenPair)
         {
-            Assert(tokenPair.Contains("-") && tokenPair.Count(c => c == '-') == 1, $"Invalid TokenPair {tokenPair}.");
-            return SortSymbols(tokenPair.Split('-'));
+            Assert(tokenPair.Contains("-") && tokenPair.Count(c => c == '-') <= 3, $"Invalid TokenPair {tokenPair}.");
+            var pairList = tokenPair.Split('-');
+            return FormatAndSortSymbol(pairList);
+        }
+
+        private string[] FormatAndSortSymbol(params string[] symbols)
+        {
+            return symbols.Length switch
+            {
+                2 => SortSymbols(symbols), // FT-FT
+                3 => GetAndSortSymbol(symbols), // FT-NFT/NFT-FT
+                4 => GetAndSortNftSymbol(symbols), // NFT-NFT
+                _ => throw new AssertionException("Invalid pair list length")
+            };
+        }
+
+        private bool IsValidItemIdChar(char character)
+        {
+            return character >= '0' && character <= '9';
         }
 
         private void ValidTokenSymbol(string token)
@@ -214,12 +267,12 @@ namespace Awaken.Contracts.Swap
         private long[] PerformBurn(Address to, string tokenA, string tokenB, long liquidityRemoveAmount)
         {
             var pairAddress = GetPairAddress(tokenA, tokenB);
-            var balanceA =State.PoolBalanceMap[pairAddress][tokenA];
+            var balanceA = State.PoolBalanceMap[pairAddress][tokenA];
             var balanceB = State.PoolBalanceMap[pairAddress][tokenB];
             var reserves = GetReserves(pairAddress, tokenA, tokenB);
-            var feeOn = MintFee(reserves[0], reserves[1], pairAddress, tokenA, tokenB,  out var totalSupply);
+            var feeOn = MintFee(reserves[0], reserves[1], pairAddress, tokenA, tokenB, out var totalSupply);
             var lpTokenSymbol = GetTokenPairSymbol(tokenA, tokenB);
-            
+
             var amountAStr = new BigIntValue(liquidityRemoveAmount).Mul(balanceA).Div(totalSupply).Value;
             var amountBStr = new BigIntValue(liquidityRemoveAmount).Mul(balanceB).Div(totalSupply).Value;
             if (!long.TryParse(amountAStr, out var amountA))
@@ -596,7 +649,7 @@ namespace Awaken.Contracts.Swap
                 State.KValueMap[pairAddress] = new BigIntValue(0);
             }
 
-          
+
             return feeOn;
         }
 
