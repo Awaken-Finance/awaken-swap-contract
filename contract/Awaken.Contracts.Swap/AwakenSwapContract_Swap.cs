@@ -9,7 +9,7 @@ namespace Awaken.Contracts.Swap
         public override SwapOutput SwapExactTokensForTokens(SwapExactTokensForTokensInput input)
         {
             AssertContractInitialized();
-            Assert(input.Deadline >= Context.CurrentBlockTime, "Expired");
+            Assert(input.Deadline.Seconds >= Context.CurrentBlockTime.Seconds, "Expired");
             Assert(input.AmountIn > 0 && input.AmountOutMin >= 0, "Invalid Input");
             var amounts = GetAmountsOut(input.AmountIn, input.Path);
             Assert(amounts[amounts.Count - 1] >= input.AmountOutMin, "Insufficient Output amount");

@@ -10,11 +10,7 @@ namespace Awaken.Contracts.Token
     {
         public override Empty Create(CreateInput input)
         {
-            if (State.Owner.Value != null)
-            {
-                AssertSenderIsMinter();
-            }
-
+            AssertSenderIsMinter();
             Assert(!string.IsNullOrWhiteSpace(input.Symbol), "Invalid symbol.");
             Assert(!string.IsNullOrWhiteSpace(input.TokenName), "Invalid token name.");
             Assert(input.TotalSupply > 0, "Invalid total supply.");
@@ -53,11 +49,11 @@ namespace Awaken.Contracts.Token
             Assert(input.To != null, "To address not filled.");
             var tokenInfo = ValidTokenExisting(input.Symbol);
             AssertSenderIsIssuer(tokenInfo.Issuer);
-            tokenInfo.Issued = tokenInfo.Issued.Add(input.Amount);
+            // tokenInfo.Issued = tokenInfo.Issued.Add(input.Amount);
             tokenInfo.Supply = tokenInfo.Supply.Add(input.Amount);
 
-            Assert(tokenInfo.Issued <= tokenInfo.TotalSupply, "Total supply exceeded.");
-
+            // Assert(tokenInfo.Issued <= tokenInfo.TotalSupply, "Total supply exceeded.");
+ 
             State.TokenInfoMap[input.Symbol] = tokenInfo;
             ModifyBalance(input.To, input.Symbol, input.Amount);
             Context.Fire(new Issued
