@@ -297,13 +297,14 @@ namespace Awaken.Contracts.Swap
                 var to = i < path.Count - 2 ? Context.Self : lastTo;
 
                 TransferOut(pair, to, output, amountOutput);
+                Address nextPair = null;
                 if (i < path.Count - 2)
                 {
-                    var nextPair = GetPairAddress(output, path[i + 2]);
+                    nextPair = GetPairAddress(output, path[i + 2]);
                     State.PoolBalanceMap[nextPair][output] = State.PoolBalanceMap[nextPair][output].Add(amountOutput);
                 }
 
-                SwapInternal(input, output, amountInput, amountOutput, to, channel);
+                SwapInternal(input, output, amountInput, amountOutput, to, channel, nextPair);
             }
         }
 
