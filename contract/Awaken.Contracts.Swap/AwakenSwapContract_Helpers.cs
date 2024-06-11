@@ -325,13 +325,14 @@ namespace Awaken.Contracts.Swap
                 var to = i < path.Count - 2 ? Context.Self : lastTo;
                 var pair = GetPairAddress(path[i], path[i + 1]);
                 TransferOut(pair, to, output, amountOut);
+                Address nextPair = null;
                 if (i < path.Count - 2)
                 {
-                    var nextPair = GetPairAddress(output, path[i + 2]);
+                    nextPair = GetPairAddress(output, path[i + 2]);
                     State.PoolBalanceMap[nextPair][output] = State.PoolBalanceMap[nextPair][output].Add(amountOut);
                 }
 
-                SwapInternal(input, output, amountIn, amountOut, to, channel);
+                SwapInternal(input, output, amountIn, amountOut, to, channel, nextPair);
             }
         }
 
@@ -349,24 +350,29 @@ namespace Awaken.Contracts.Swap
                 var to = i < path.Count - 2 ? Context.Self : lastTo;
 
                 TransferOut(pair, to, output, amountOutput);
+                Address nextPair = null;
                 if (i < path.Count - 2)
                 {
-                    var nextPair = GetPairAddress(output, path[i + 2]);
+                    nextPair = GetPairAddress(output, path[i + 2]);
                     State.PoolBalanceMap[nextPair][output] = State.PoolBalanceMap[nextPair][output].Add(amountOutput);
                 }
 
-                SwapInternal(input, output, amountInput, amountOutput, to, channel);
+                SwapInternal(input, output, amountInput, amountOutput, to, channel, nextPair);
             }
         }
 
         private void SwapInternal(string symbolIn, string symbolOut, long amountIn, long amountOut, Address to,
-            string channel)
+            string channel, Address nextPairAddress = null)
         {
             var pairAddress = GetPairAddress(symbolIn, symbolOut);
             var reserveSymbolIn = State.TotalReservesMap[pairAddress][symbolIn];
             var reserveSymbolOut = State.TotalReservesMap[pairAddress][symbolOut];
             Assert(amountOut < reserveSymbolOut, "Insufficient reserve of out token");
             Assert(to != pairAddress, "Invalid account address");
+            if (nextPairAddress != null)
+            {
+                Assert(pairAddress != nextPairAddress, "Repeated pair address.");
+            }
 
             var feeRate = State.FeeRate.Value;
             var totalFee = amountIn.Mul(feeRate).Div(FeeRateMax);
@@ -655,7 +661,7 @@ namespace Awaken.Contracts.Swap
 
         private void AssertContractInitialized()
         {
-            Assert(State.Admin.Value != null, "Contract not initialized.");
+            Assert(State.IsInitialized.Value, "Contract not initialized.");
         }
 
         private void AssertSenderIsAdmin()
