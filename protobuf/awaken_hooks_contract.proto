@@ -1,0 +1,159 @@
+syntax = "proto3";
+
+import "aelf/core.proto";
+import "aelf/options.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/timestamp.proto";
+import "acs12.proto";
+
+option csharp_namespace = "Awaken.Contracts.Hooks";
+
+service AwakenHooksContract {
+  option (aelf.csharp_state) = "Awaken.Contracts.Hooks.AwakenHooksContractState";
+  option (aelf.base) = "acs12.proto";
+
+  rpc Initialize (InitializeInput) returns (google.protobuf.Empty) {
+  }
+  rpc CreatePair (CreatePairInput) returns (google.protobuf.Empty) {
+  }
+  rpc AddLiquidity (AddLiquidityInput) returns (google.protobuf.Empty) {
+  }
+  rpc RemoveLiquidity (RemoveLiquidityInput) returns (google.protobuf.Empty) {
+  }
+  rpc SwapExactTokensForTokens (SwapExactTokensForTokensInput) returns (google.protobuf.Empty) {
+  }
+  rpc SwapTokensForExactTokens (SwapTokensForExactTokensInput) returns (google.protobuf.Empty) {
+  }
+  rpc SetSwapContractAddress (SetSwapContractAddressInput) returns (google.protobuf.Empty) {
+  }
+  
+  // View
+  rpc GetSwapContractList (google.protobuf.Empty) returns (GetSwapContractListOutput) {
+    option (aelf.is_view) = true;
+  }
+
+  rpc GetAmountsOut (GetAmountsOutInput) returns (GetAmountsOutOutput) {
+    option (aelf.is_view) = true;
+  }
+  rpc GetAmountsIn (GetAmountsInInput) returns (GetAmountsInOutput) {
+    option (aelf.is_view) = true;
+  }
+}
+
+// Inputs
+message InitializeInput {
+  SwapContractInfoList swap_contract_list = 1;
+  aelf.Address admin = 2;
+}
+
+message SetSwapContractAddressInput {
+  SwapContractInfoList swap_contract_list = 1;
+}
+
+message SwapContractInfo {
+  int64 fee_rate = 1;
+  aelf.Address contract_address = 2;
+}
+
+message SwapContractInfoList {
+  repeated SwapContractInfo swap_contracts = 1;
+}
+
+message GetSwapContractListOutput {
+    SwapContractInfoList swap_contract_list = 1;
+}
+
+message CreatePairInput {
+  string symbol_pair = 1;
+  int64 fee_rate = 2;
+}
+
+message AddLiquidityInput {
+  string symbol_a = 1;
+  string symbol_b = 2;
+  int64 amount_a_desired = 3;
+  int64 amount_b_desired = 4;
+  int64 amount_a_min = 5;
+  int64 amount_b_min = 6;
+  aelf.Address to = 7;
+  google.protobuf.Timestamp deadline = 8;
+  string channel = 9;
+  int64 fee_rate = 10;
+}
+
+message RemoveLiquidityInput {
+  string symbol_a = 1;
+  string symbol_b = 2;
+  int64 amount_a_min = 3;
+  int64 amount_b_min = 4;
+  int64 liquidity_remove = 5;
+  aelf.Address to = 6;
+  google.protobuf.Timestamp deadline = 7;
+  int64 fee_rate = 8;
+}
+
+message SwapExactTokensForTokensInput {
+  repeated SwapExactTokensForTokens swap_tokens = 1;
+}
+
+message SwapExactTokensForTokens {
+  int64 amount_in = 1;
+  int64 amount_out_min = 2;
+  repeated string path = 3;
+  aelf.Address to = 4;
+  google.protobuf.Timestamp deadline = 5;
+  string channel = 6;
+  repeated int64 fee_rates = 7;
+}
+
+message SwapTokensForExactTokensInput {
+  repeated SwapTokensForExactTokens swap_tokens = 1;
+}
+
+message SwapTokensForExactTokens {
+  int64 amount_out = 1;
+  int64 amount_in_max = 2;
+  repeated string path = 3;
+  aelf.Address to = 4;
+  google.protobuf.Timestamp deadline = 5;
+  string channel = 6;
+  repeated int64 fee_rates = 7;
+}
+
+// Outputs
+message AddLiquidityOutput {
+  string symbol_a = 1;
+  string symbol_b = 2;
+  int64 amount_a = 3;
+  int64 amount_b = 4;
+  int64 liquidity_token = 5;
+}
+
+message RemoveLiquidityOutput {
+  int64 amount_a = 1;
+  int64 amount_b = 2;
+  string symbol_a = 3;
+  string symbol_b = 4;
+}
+
+message GetAmountsOutInput {
+  int64 amount_in= 1;
+  repeated string path = 2;
+  repeated int64 fee_rates = 3;
+}
+
+message GetAmountsInInput {
+  int64 amount_out= 1;
+  repeated string path = 2;
+  repeated int64 fee_rates = 3;
+}
+
+message GetAmountsOutOutput{
+  repeated int64 amount = 1;
+}
+
+message GetAmountsInOutput{
+  repeated int64 amount = 1;
+}
+
