@@ -32,6 +32,9 @@
         <ContractReference Include="..\..\protobuf\token_contract.proto">
             <Link>Protobuf\Proto\reference\token_contract.proto</Link>
         </ContractReference>
+        <ContractReference Include="..\..\protobuf\awaken_token_contract.proto">
+            <Link>Protobuf\Proto\reference\awaken_token_contract.proto</Link>
+        </ContractReference>
         <ContractReference Include="..\..\protobuf\awaken_investment_contract.proto">
             <Link>Protobuf\Proto\reference\awaken_investment_contract.proto</Link>
         </ContractReference>

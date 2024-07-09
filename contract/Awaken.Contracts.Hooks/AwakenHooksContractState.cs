@@ -1,6 +1,6 @@
-using System;
 using AElf.Sdk.CSharp.State;
 using AElf.Types;
+using Awaken.Contracts.Token;
 
 namespace Awaken.Contracts.Hooks;
 
@@ -16,4 +16,5 @@ public class AwakenHooksContractState : ContractState
         get;
         set;
     }
+
 }

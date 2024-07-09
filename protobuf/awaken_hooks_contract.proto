@@ -53,7 +53,8 @@ message SetSwapContractAddressInput {
 
 message SwapContractInfo {
   int64 fee_rate = 1;
-  aelf.Address contract_address = 2;
+  aelf.Address swap_contract_address = 2;
+  aelf.Address lp_token_contract_address = 3;
 }
 
 message SwapContractInfoList {

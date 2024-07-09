@@ -1,7 +1,6 @@
 using System.Linq;
 using AElf.Contracts.MultiToken;
 using AElf.Sdk.CSharp;
-using AElf.Types;
 using Awaken.Contracts.Swap;
 using Google.Protobuf;
 using Google.Protobuf.Collections;
@@ -49,13 +48,15 @@ public class AwakenHooksContract : AwakenHooksContractContainer.AwakenHooksContr
                 swapContractInfo = new SwapContractInfo
                 {
                     FeeRate = contractInfo.FeeRate,
-                    ContractAddress = contractInfo.ContractAddress
+                    SwapContractAddress = contractInfo.SwapContractAddress,
+                    LpTokenContractAddress = contractInfo.LpTokenContractAddress
                 };
                 swapContractInfoList.SwapContracts.Add(swapContractInfo);
             }
             else
             {
-                swapContractInfo.ContractAddress = contractInfo.ContractAddress;
+                swapContractInfo.SwapContractAddress = contractInfo.SwapContractAddress;
+                swapContractInfo.LpTokenContractAddress = contractInfo.LpTokenContractAddress;
             }
         }
         State.SwapContractInfoList.Value = swapContractInfoList;
@@ -80,7 +81,7 @@ public class AwakenHooksContract : AwakenHooksContractContainer.AwakenHooksContr
             {
                 var swapContractAddress =
                     State.SwapContractInfoList.Value.SwapContracts.First(t =>
-                        t.FeeRate == swapInput.FeeRates[pathCount]).ContractAddress;
+                        t.FeeRate == swapInput.FeeRates[pathCount]).SwapContractAddress;
                 State.TokenContract.Approve.Send(new ApproveInput()
                 {
                     Spender = swapContractAddress,
@@ -121,7 +122,7 @@ public class AwakenHooksContract : AwakenHooksContractContainer.AwakenHooksContr
             {
                 var swapContractAddress =
                     State.SwapContractInfoList.Value.SwapContracts.First(t =>
-                        t.FeeRate == swapInput.FeeRates[pathCount]).ContractAddress;
+                        t.FeeRate == swapInput.FeeRates[pathCount]).SwapContractAddress;
                 State.TokenContract.Approve.Send(new ApproveInput()
                 {
                     Spender = swapContractAddress,
@@ -171,7 +172,7 @@ public class AwakenHooksContract : AwakenHooksContractContainer.AwakenHooksContr
                 State.SwapContractInfoList.Value.SwapContracts.FirstOrDefault(t =>
                     t.FeeRate == feeRate);
             Assert(swapContract != null, "feeRate not existed");
-            var amountIn = Context.Call<Int64Value>(swapContract.ContractAddress, "GetAmountIn", new GetAmountInInput()
+            var amountIn = Context.Call<Int64Value>(swapContract.SwapContractAddress, "GetAmountIn", new GetAmountInInput()
             {
                 AmountOut = amounts[0],
                 SymbolIn = path[i],
@@ -195,7 +196,7 @@ public class AwakenHooksContract : AwakenHooksContractContainer.AwakenHooksContr
                 State.SwapContractInfoList.Value.SwapContracts.FirstOrDefault(t =>
                     t.FeeRate == feeRate);
             Assert(swapContract != null, "feeRate not existed");
-            var amountOut = Context.Call<Int64Value>(swapContract.ContractAddress, "GetAmountOut", new GetAmountOutInput
+            var amountOut = Context.Call<Int64Value>(swapContract.SwapContractAddress, "GetAmountOut", new GetAmountOutInput
             {
                 AmountIn = amounts[i],
                 SymbolIn = path[i],
@@ -212,7 +213,7 @@ public class AwakenHooksContract : AwakenHooksContractContainer.AwakenHooksContr
             State.SwapContractInfoList.Value.SwapContracts.FirstOrDefault(t =>
                 t.FeeRate == input.FeeRate);
         Assert(swapContract != null, "feeRate not existed");
-        Context.SendInline(swapContract.ContractAddress, "CreatePair", new Swap.CreatePairInput
+        Context.SendInline(swapContract.SwapContractAddress, "CreatePair", new Swap.CreatePairInput
         {
             SymbolPair = input.SymbolPair
         });
@@ -221,27 +222,160 @@ public class AwakenHooksContract : AwakenHooksContractContainer.AwakenHooksContr
 
     public override Empty AddLiquidity(AddLiquidityInput input)
     {
-        var swapContract =
-            State.SwapContractInfoList.Value.SwapContracts.FirstOrDefault(t =>
-                t.FeeRate == input.FeeRate);
-        Assert(swapContract != null, "feeRate not existed");
-        Context.SendInline(swapContract.ContractAddress, "AddLiquidity", new AddLiquidityInput
+        var amounts = AddLiquidity(input.SymbolA, input.SymbolB, input.AmountADesired, input.AmountBDesired,
+            input.AmountAMin, input.AmountBMin, input.FeeRate);
+        var swapContractAddress =
+            State.SwapContractInfoList.Value.SwapContracts.First(t =>
+                t.FeeRate == input.FeeRate).SwapContractAddress;
+        State.TokenContract.TransferFrom.Send(new TransferFromInput
         {
-            AmountADesired = input.AmountADesired,
-            AmountAMin = input.AmountAMin,
+            Symbol = input.SymbolA,
+            Amount = amounts[0],
+            From = Context.Sender,
+            To = Context.Self,
+            Memo = "Hooks AddLiquidity"
+        });
+        State.TokenContract.Approve.Send(new ApproveInput
+        {
+            Symbol = input.SymbolA,
+            Amount = amounts[0],
+            Spender = swapContractAddress
+        });
+        State.TokenContract.TransferFrom.Send(new TransferFromInput
+        {
+            Symbol = input.SymbolB,
+            Amount = amounts[1],
+            From = Context.Sender,
+            To = Context.Self,
+            Memo = "Hooks AddLiquidity"
+        });
+        State.TokenContract.Approve.Send(new ApproveInput
+        {
+            Symbol = input.SymbolB,
+            Amount = amounts[1],
+            Spender = swapContractAddress
+        });
+        Context.SendInline(swapContractAddress, "AddLiquidity", new AddLiquidityInput
+        {
+            AmountADesired = amounts[0],
+            AmountAMin = amounts[0],
             SymbolA = input.SymbolA,
-            AmountBDesired = input.AmountBDesired,
-            AmountBMin = input.AmountBMin,
+            AmountBDesired = amounts[1],
+            AmountBMin = amounts[1],
             SymbolB = input.SymbolB,
             Channel = input.Channel,
             Deadline = input.Deadline,
             To = input.To
         });
-        return base.AddLiquidity(input);
+        return new Empty();
     }
 
     public override Empty RemoveLiquidity(RemoveLiquidityInput input)
     {
-        return base.RemoveLiquidity(input);
+        var swapContract =
+            State.SwapContractInfoList.Value.SwapContracts.FirstOrDefault(t =>
+                t.FeeRate == input.FeeRate);
+        Assert(swapContract != null, "feeRate not existed");
+        var lpTokenSymbol = GetTokenPairSymbol(input.SymbolA, input.SymbolB);
+        Context.SendInline(swapContract.LpTokenContractAddress, "TransferFrom", new Token.TransferFromInput
+        {
+            Symbol = lpTokenSymbol,
+            Amount = input.LiquidityRemove,
+            From = Context.Sender,
+            To = Context.Self
+        });
+        Context.SendInline(swapContract.LpTokenContractAddress, "Approve", new Token.ApproveInput
+        {
+            Symbol = lpTokenSymbol,
+            Amount = input.LiquidityRemove,
+            Spender = swapContract.SwapContractAddress
+        });
+        Context.SendInline(swapContract.SwapContractAddress, "RemoveLiquidity", new RemoveLiquidityInput
+        {
+            SymbolA = input.SymbolA,
+            SymbolB = input.SymbolB,
+            AmountAMin = input.AmountAMin,
+            AmountBMin = input.AmountBMin,
+            LiquidityRemove = input.LiquidityRemove,
+            Deadline = input.Deadline,
+            To = input.To
+        });
+        return new Empty();
+    }
+    
+    private long[] AddLiquidity(string tokenA, string tokenB, long amountADesired, long amountBDesired,
+        long amountAMin, long amountBMin, long feeRate)
+    {
+        var swapContract =
+            State.SwapContractInfoList.Value.SwapContracts.FirstOrDefault(t =>
+                t.FeeRate == feeRate);
+        Assert(swapContract != null, "feeRate not existed");
+
+        long amountA;
+        long amountB;
+        var reservesOutput =
+            Context.Call<GetReservesOutput>(swapContract.SwapContractAddress, "GetReserves", new GetReservesInput{
+                SymbolPair = { tokenA + "-" + tokenB }
+            });
+        var reserves = reservesOutput.Results[0];
+        if (reserves.ReserveA == 0 && reserves.ReserveB == 0)
+        {
+            // First time to add liquidity.
+            amountA = amountADesired;
+            amountB = amountBDesired;
+        }
+        else
+        {
+            // Not the first time, need to consider the changes of liquidity pool. 
+            var amountBOptimal = Context.Call<Int64Value>(swapContract.SwapContractAddress, "Quote", new QuoteInput
+            {
+                SymbolA = tokenA,
+                AmountA = amountADesired,
+                SymbolB = tokenB,
+            }).Value;
+            if (amountBOptimal <= amountBDesired)
+            {
+                Assert(amountBOptimal >= amountBMin, $"Insufficient amount of token {tokenB}.");
+                amountA = amountADesired;
+                amountB = amountBOptimal;
+            }
+            else
+            {
+                var amountAOptimal = Context.Call<Int64Value>(swapContract.SwapContractAddress, "Quote", new QuoteInput
+                {
+                    SymbolA = tokenB,
+                    SymbolB = tokenA,
+                    AmountA = amountBDesired
+                }).Value;
+                Assert(amountAOptimal <= amountADesired);
+                Assert(amountAOptimal >= amountAMin, $"Insufficient amount of token {tokenA}.");
+                amountA = amountAOptimal;
+                amountB = amountBDesired;
+            }
+        }
+
+        return new[]
+        {
+            amountA, amountB
+        };
+    }
+    
+    private string GetTokenPairSymbol(string tokenA, string tokenB)
+    {
+        var symbols = SortSymbols(tokenA, tokenB);
+        return $"ALP {symbols[0]}-{symbols[1]}";
+    }
+
+    private string[] SortSymbols(params string[] symbols)
+    {
+        Assert(
+            symbols.Length == 2 && !symbols.First().All(IsValidItemIdChar) &&
+            !symbols.Last().All(IsValidItemIdChar), "Invalid symbols for sorting.");
+        return symbols.OrderBy(s => s).ToArray();
+    }
+    
+    private bool IsValidItemIdChar(char character)
+    {
+        return character >= '0' && character <= '9';
     }
 }
