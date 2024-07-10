@@ -1,4 +1,5 @@
 using AElf.Sdk.CSharp.State;
+using AElf.Standards.ACS0;
 using AElf.Types;
 using Awaken.Contracts.Token;
 
@@ -16,5 +17,7 @@ public class AwakenHooksContractState : ContractState
         get;
         set;
     }
+    
+    internal ACS0Container.ACS0ReferenceState GenesisContract { get; set; }
 
 }

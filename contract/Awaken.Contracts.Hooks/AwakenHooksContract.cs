@@ -13,6 +13,7 @@ public class AwakenHooksContract : AwakenHooksContractContainer.AwakenHooksContr
     public override Empty SetSwapContractAddress(SetSwapContractAddressInput input)
     {
         Assert(Context.Sender == State.Admin.Value, "No permission.");
+        Assert(input.SwapContractList != null && input.SwapContractList.SwapContracts.Count > 0, "Invalid input.");
         FillSwapContractInfoList(input.SwapContractList);
         return new Empty();
     }
@@ -28,9 +29,15 @@ public class AwakenHooksContract : AwakenHooksContractContainer.AwakenHooksContr
     public override Empty Initialize(InitializeInput input)
     {
         Assert(!State.Initialized.Value, "Already initialized.");
+        State.GenesisContract.Value = Context.GetZeroSmartContractAddress();
+        var author = State.GenesisContract.GetContractAuthor.Call(Context.Self);
+        Assert(Context.Sender == author, "No permission.");
         State.TokenContract.Value =
             Context.GetContractAddressByName(SmartContractConstants.TokenContractSystemName);
-        FillSwapContractInfoList(input.SwapContractList);
+        if (input.SwapContractList?.SwapContracts.Count > 0)
+        {
+            FillSwapContractInfoList(input.SwapContractList);
+        }
         State.Admin.Value = input.Admin ?? Context.Sender;
         State.Initialized.Value = true;
         return new Empty();
@@ -38,7 +45,6 @@ public class AwakenHooksContract : AwakenHooksContractContainer.AwakenHooksContr
 
     private void FillSwapContractInfoList(SwapContractInfoList inputSwapContractInfoList)
     {
-        Assert(inputSwapContractInfoList != null && inputSwapContractInfoList.SwapContracts.Count > 1, "Invalid input.");
         var swapContractInfoList = State.SwapContractInfoList.Value ??= new SwapContractInfoList();
         foreach (var contractInfo in inputSwapContractInfoList.SwapContracts)
         {
@@ -138,7 +144,7 @@ public class AwakenHooksContract : AwakenHooksContractContainer.AwakenHooksContr
                     Channel = "hooks",
                     To = pathCount == swapInput.Path.Count - 2 ? swapInput.To : Context.Self
                 };
-                Context.SendInline(swapContractAddress, "SwapTokensForExactTokens", swapExactTokensForTokensInput.ToByteString());
+                Context.SendInline(swapContractAddress, "SwapExactTokensForTokens", swapExactTokensForTokensInput.ToByteString());
             }
         }
         return new Empty();
@@ -175,8 +181,8 @@ public class AwakenHooksContract : AwakenHooksContractContainer.AwakenHooksContr
             var amountIn = Context.Call<Int64Value>(swapContract.SwapContractAddress, "GetAmountIn", new GetAmountInInput()
             {
                 AmountOut = amounts[0],
-                SymbolIn = path[i],
-                SymbolOut = path[i+1]
+                SymbolIn = path[i - 1],
+                SymbolOut = path[i]
             }.ToByteString());
             amounts.Insert(0, amountIn.Value);
         }
@@ -217,7 +223,7 @@ public class AwakenHooksContract : AwakenHooksContractContainer.AwakenHooksContr
         {
             SymbolPair = input.SymbolPair
         });
-        return base.CreatePair(input);
+        return new Empty();
     }
 
     public override Empty AddLiquidity(AddLiquidityInput input)
