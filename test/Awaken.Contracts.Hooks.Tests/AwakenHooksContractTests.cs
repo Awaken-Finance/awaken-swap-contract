@@ -76,6 +76,24 @@ public class AwakenHooksContractTests : AwakenHooksContractTestBase
         swapContractListOutput.SwapContractList.SwapContracts[1].SwapContractAddress.ShouldBe(UserLilyAddress);
         swapContractListOutput.SwapContractList.SwapContracts[1].LpTokenContractAddress.ShouldBe(UserTomAddress);
         
+        await AdminHooksStud.AddSwapContractInfo.SendAsync(new AddSwapContractInfoInput()
+        {
+            SwapContractList = new SwapContractInfoList()
+            {
+                SwapContracts = { new SwapContractInfo()
+                {
+                    FeeRate = 10,
+                    LpTokenContractAddress = UserLilyAddress,
+                    SwapContractAddress = UserTomAddress
+                } }
+            }
+        });
+        swapContractListOutput = await AdminHooksStud.GetSwapContractList.CallAsync(new Empty());
+        swapContractListOutput.SwapContractList.SwapContracts.Count.ShouldBe(2);
+        swapContractListOutput.SwapContractList.SwapContracts[1].FeeRate.ShouldBe(10);
+        swapContractListOutput.SwapContractList.SwapContracts[1].SwapContractAddress.ShouldBe(UserTomAddress);
+        swapContractListOutput.SwapContractList.SwapContracts[1].LpTokenContractAddress.ShouldBe(UserLilyAddress);
+        
         result = await TomHooksStud.RemoveSwapContractInfo.SendWithExceptionAsync(new RemoveSwapContractInfoInput());
         result.TransactionResult.Error.ShouldContain("No permission.");
         result = await AdminHooksStud.RemoveSwapContractInfo.SendWithExceptionAsync(new RemoveSwapContractInfoInput());
