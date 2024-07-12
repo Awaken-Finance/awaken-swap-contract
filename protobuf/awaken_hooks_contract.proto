@@ -25,7 +25,9 @@ service AwakenHooksContract {
   }
   rpc SwapTokensForExactTokens (SwapTokensForExactTokensInput) returns (google.protobuf.Empty) {
   }
-  rpc SetSwapContractAddress (SetSwapContractAddressInput) returns (google.protobuf.Empty) {
+  rpc AddSwapContractInfo (AddSwapContractInfoInput) returns (google.protobuf.Empty) {
+  }
+  rpc RemoveSwapContractInfo (RemoveSwapContractInfoInput) returns (google.protobuf.Empty) {
   }
   
   // View
@@ -47,8 +49,12 @@ message InitializeInput {
   aelf.Address admin = 2;
 }
 
-message SetSwapContractAddressInput {
+message AddSwapContractInfoInput {
   SwapContractInfoList swap_contract_list = 1;
+}
+
+message RemoveSwapContractInfoInput {
+  repeated int64 fee_rates = 1;
 }
 
 message SwapContractInfo {
@@ -156,5 +162,13 @@ message GetAmountsOutOutput{
 
 message GetAmountsInOutput{
   repeated int64 amount = 1;
+}
+
+//event
+message HooksTransactionCreated{
+  option (aelf.is_event) = true;
+  aelf.Address sender = 1 [(aelf.is_indexed) = true];
+  string method_name = 2 [(aelf.is_indexed) = true];
+  bytes args = 3;
 }
 

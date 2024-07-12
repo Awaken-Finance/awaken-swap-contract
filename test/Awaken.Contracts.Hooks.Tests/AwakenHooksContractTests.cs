@@ -2,6 +2,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using AElf;
 using AElf.Contracts.MultiToken;
 using AElf.CSharp.Core;
 using AElf.Types;
@@ -45,8 +46,47 @@ public class AwakenHooksContractTests : AwakenHooksContractTestBase
     }
 
     [Fact]
-    public async Task SetSwapContractAddressTest()
+    public async Task AddSwapContractInfoTest()
     {
+        await Initialize();
+        var result = await TomHooksStud.AddSwapContractInfo.SendWithExceptionAsync(new AddSwapContractInfoInput());
+        result.TransactionResult.Error.ShouldContain("No permission.");
+        result = await AdminHooksStud.AddSwapContractInfo.SendWithExceptionAsync(new AddSwapContractInfoInput());
+        result.TransactionResult.Error.ShouldContain("Invalid input.");
+        result = await AdminHooksStud.AddSwapContractInfo.SendWithExceptionAsync(new AddSwapContractInfoInput
+        {
+            SwapContractList = new SwapContractInfoList()
+        });
+        result.TransactionResult.Error.ShouldContain("Invalid input.");
+        await AdminHooksStud.AddSwapContractInfo.SendAsync(new AddSwapContractInfoInput()
+        {
+            SwapContractList = new SwapContractInfoList()
+            {
+                SwapContracts = { new SwapContractInfo()
+                {
+                    FeeRate = 10,
+                    LpTokenContractAddress = UserTomAddress,
+                    SwapContractAddress = UserLilyAddress
+                } }
+            }
+        });
+        var swapContractListOutput = await AdminHooksStud.GetSwapContractList.CallAsync(new Empty());
+        swapContractListOutput.SwapContractList.SwapContracts.Count.ShouldBe(2);
+        swapContractListOutput.SwapContractList.SwapContracts[1].FeeRate.ShouldBe(10);
+        swapContractListOutput.SwapContractList.SwapContracts[1].SwapContractAddress.ShouldBe(UserLilyAddress);
+        swapContractListOutput.SwapContractList.SwapContracts[1].LpTokenContractAddress.ShouldBe(UserTomAddress);
+        
+        result = await TomHooksStud.RemoveSwapContractInfo.SendWithExceptionAsync(new RemoveSwapContractInfoInput());
+        result.TransactionResult.Error.ShouldContain("No permission.");
+        result = await AdminHooksStud.RemoveSwapContractInfo.SendWithExceptionAsync(new RemoveSwapContractInfoInput());
+        result.TransactionResult.Error.ShouldContain("Invalid input.");
+        await AdminHooksStud.RemoveSwapContractInfo.SendAsync(new RemoveSwapContractInfoInput()
+        {
+            FeeRates = { 10 }
+        });
+        swapContractListOutput = await AdminHooksStud.GetSwapContractList.CallAsync(new Empty());
+        swapContractListOutput.SwapContractList.SwapContracts.Count.ShouldBe(1);
+        swapContractListOutput.SwapContractList.SwapContracts[0].FeeRate.ShouldBe(_feeRate);
     }
 
     [Fact]
