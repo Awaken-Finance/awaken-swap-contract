@@ -1,6 +1,8 @@
 using System.Linq;
+using AElf;
 using AElf.Contracts.MultiToken;
 using AElf.Sdk.CSharp;
+using AElf.Types;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 
@@ -24,10 +26,18 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
         State.Initialized.Value = true;
         return new Empty();
     }
-    
+
+    public override Empty SetAdmin(Address input)
+    {
+        Assert(!input.Value.IsNullOrEmpty(), "Invalid input.");
+        CheckAdminPermission();
+        State.Admin.Value = input;
+        return new Empty();
+    }
+
     public override Empty AddSwapContractInfo(AddSwapContractInfoInput input)
     {
-        Assert(Context.Sender == State.Admin.Value, "No permission.");
+        CheckAdminPermission();
         Assert(input.SwapContractList != null && input.SwapContractList.SwapContracts.Count > 0, "Invalid input.");
         FillSwapContractInfoList(input.SwapContractList);
         return new Empty();
@@ -35,7 +45,7 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
 
     public override Empty RemoveSwapContractInfo(RemoveSwapContractInfoInput input)
     {
-        Assert(Context.Sender == State.Admin.Value, "No permission.");
+        CheckAdminPermission();
         Assert(input.FeeRates.Count > 0, "Invalid input.");
         var swapContractInfoList = State.SwapContractInfoList.Value ??= new SwapContractInfoList();
         foreach (var feeRate in input.FeeRates)

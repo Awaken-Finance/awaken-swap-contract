@@ -1,3 +1,4 @@
+using AElf.Types;
 using Google.Protobuf.WellKnownTypes;
 
 namespace Awaken.Contracts.Hooks;
@@ -26,5 +27,10 @@ public partial class AwakenHooksContract
         {
             Amount = { GetAmountsIn(input.AmountOut, input.Path, input.FeeRates) }
         };
+    }
+
+    public override Address GetAdmin(Empty input)
+    {
+        return State.Admin.Value;
     }
 }

@@ -153,4 +153,9 @@ public partial class AwakenHooksContract
     {
         return character >= '0' && character <= '9';
     }
+
+    private void CheckAdminPermission()
+    {
+        Assert(Context.Sender == State.Admin.Value, "No permission.");
+    }
 }

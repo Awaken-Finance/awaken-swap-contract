@@ -37,12 +37,25 @@ public class AwakenHooksContractTests : AwakenHooksContractTestBase
         swapContractList.SwapContractList.SwapContracts[0].SwapContractAddress.ShouldBe(AwakenSwapContractAddress);
         swapContractList.SwapContractList.SwapContracts[0].LpTokenContractAddress.ShouldBe(LpTokenContractAddress);
         swapContractList.SwapContractList.SwapContracts[0].FeeRate.ShouldBe(10);
-        
+
         result = await AdminHooksStud.Initialize.SendWithExceptionAsync(new InitializeInput
         {
             SwapContractList = new SwapContractInfoList()
         });
         result.TransactionResult.Error.ShouldContain("Already initialized.");
+        
+        var admin = await AdminHooksStud.GetAdmin.CallAsync(new Empty());
+        admin.ShouldBe(AdminAddress);
+        
+        result = await TomHooksStud.SetAdmin.SendWithExceptionAsync(new Address());
+        result.TransactionResult.Error.ShouldContain("Invalid input");
+        
+        result = await TomHooksStud.SetAdmin.SendWithExceptionAsync(UserTomAddress);
+        result.TransactionResult.Error.ShouldContain("No permission.");
+        
+        await AdminHooksStud.SetAdmin.SendAsync(UserTomAddress);
+        admin = await AdminHooksStud.GetAdmin.CallAsync(new Empty());
+        admin.ShouldBe(UserTomAddress);
     }
 
     [Fact]
