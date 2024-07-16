@@ -126,8 +126,7 @@ public class AwakenHooksContractTests : AwakenHooksContractTestBase
         await Initialize();
         var result = await TomHooksStud.CreatePair.SendWithExceptionAsync(new CreatePairInput()
         {
-            SymbolPair = "ELF-TEST",
-            FeeRate = 10
+            SymbolPair = "ELF-TEST"
         });
         result.TransactionResult.Error.ShouldContain("feeRate not existed");
         //success
@@ -136,6 +135,19 @@ public class AwakenHooksContractTests : AwakenHooksContractTestBase
             SymbolPair = "ELF-TEST",
             FeeRate = _feeRate
         });
+        
+        result = await TomHooksStud.CreatePair.SendWithExceptionAsync(new CreatePairInput()
+        {
+            SymbolPair = "ELF-TEST",
+            FeeRate = _feeRate
+        });
+        result.TransactionResult.Error.ShouldContain("Pair ELF-TEST Already Exist");
+        
+        result = await TomHooksStud.CreatePair.SendWithExceptionAsync(new CreatePairInput()
+        {
+            FeeRate = _feeRate
+        });
+        result.TransactionResult.Error.ShouldContain("Invalid TokenPair");
     }
 
     [Fact]
@@ -162,6 +174,47 @@ public class AwakenHooksContractTests : AwakenHooksContractTestBase
             FeeRate = 100
         });
         result.TransactionResult.Error.ShouldContain("feeRate not existed");
+        
+        await UserTomTokenContractStub.UnApprove.SendAsync(new UnApproveInput
+        {
+            Symbol = "ELF",
+            Amount = 100000000000000,
+            Spender = AwakenHooksContractAddress
+        });
+        result = await TomHooksStud.AddLiquidity.SendWithExceptionAsync(new AddLiquidityInput
+        {
+            AmountADesired = amountADesired,
+            AmountAMin = amountADesired,
+            AmountBDesired = amountBDesired,
+            AmountBMin = amountBDesired,
+            Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+            SymbolA = "ELF",
+            SymbolB = "TEST",
+            To = UserTomAddress,
+            FeeRate = _feeRate
+        });
+        result.TransactionResult.Error.ShouldContain("Insufficient allowance. Token: ELF");
+        
+        await UserTomTokenContractStub.Approve.SendAsync(new ApproveInput()
+        {
+            Symbol = "ELF",
+            Amount = 100000000000000,
+            Spender = AwakenHooksContractAddress
+        });
+        
+        result = await TomHooksStud.AddLiquidity.SendWithExceptionAsync(new AddLiquidityInput
+        {
+            AmountADesired = amountADesired,
+            AmountAMin = amountADesired,
+            AmountBDesired = amountBDesired,
+            AmountBMin = amountBDesired,
+            Deadline = Timestamp.FromDateTime(DateTime.UtcNow.AddSeconds(-5)),
+            SymbolA = "ELF",
+            SymbolB = "TEST",
+            To = UserTomAddress,
+            FeeRate = _feeRate
+        });
+        result.TransactionResult.Error.ShouldContain("Expired");
         
         await TomHooksStud.AddLiquidity.SendAsync(new AddLiquidityInput
         {
@@ -299,6 +352,20 @@ public class AwakenHooksContractTests : AwakenHooksContractTestBase
             FeeRate = 10
         });
         result.TransactionResult.Error.ShouldContain("feeRate not existed");
+        
+        result = await TomHooksStud.RemoveLiquidity.SendWithExceptionAsync(new RemoveLiquidityInput()
+        {
+            SymbolA = "ELF",
+            AmountAMin = 0,
+            SymbolB = "TEST",
+            AmountBMin = 0,
+            LiquidityRemove = 1,
+            Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+            To = UserTomAddress,
+            FeeRate = _feeRate
+        });
+        result.TransactionResult.Error.ShouldContain("Insufficient allowance. Token: ALP ELF-TEST");
+        
         await TomLpStub.Approve.SendAsync(new Token.ApproveInput
         {
             Symbol = GetTokenPairSymbol("ELF", "TEST"),
@@ -363,6 +430,39 @@ public class AwakenHooksContractTests : AwakenHooksContractTestBase
             Path = { "TEST","ELF","DAI" },
             FeeRates = { _feeRate, _feeRate }
         });
+        await UserTomTokenContractStub.UnApprove.SendAsync(new UnApproveInput()
+            {
+                Spender = AwakenHooksContractAddress,
+                Symbol = "TEST",
+                Amount = 10000000000000
+            }
+        );
+        result = await TomHooksStud.SwapExactTokensForTokens.SendWithExceptionAsync(
+            new SwapExactTokensForTokensInput
+            {
+                SwapTokens =
+                {
+                    new SwapExactTokensForTokens
+                    {
+                        AmountIn = amountIn,
+                        AmountOutMin = 0,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF","DAI" },
+                        FeeRates = { _feeRate, _feeRate }
+                    },
+                }
+            });
+        result.TransactionResult.Error.ShouldContain("Insufficient allowance. Token: TEST");
+        
+        await UserTomTokenContractStub.Approve.SendAsync(new ApproveInput()
+            {
+                Spender = AwakenHooksContractAddress,
+                Symbol = "TEST",
+                Amount = 10000000000000
+            }
+        );
         await TomHooksStud.SwapExactTokensForTokens.SendAsync(
             new SwapExactTokensForTokensInput
             {
