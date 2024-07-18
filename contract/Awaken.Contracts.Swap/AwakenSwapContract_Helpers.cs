@@ -369,12 +369,18 @@ namespace Awaken.Contracts.Swap
             Assert(to != pairAddress, "Invalid account address");
 
             var feeRate = State.FeeRate.Value;
-            var totalFee = amountIn.Mul(feeRate).Div(FeeRateMax);
+            var amountInBigIntValue = new BigIntValue(amountIn);
+            var totalFeeStr = amountInBigIntValue.Mul(feeRate).Div(FeeRateMax).Value;
+            if (!long.TryParse(totalFeeStr, out long totalFee))
+            {
+                throw new AssertionException($"Failed to parse {totalFeeStr}");
+            }
 
             var balanceIn = State.PoolBalanceMap[pairAddress][symbolIn];
             var balanceOut = State.PoolBalanceMap[pairAddress][symbolOut];
             Assert(amountIn > 0, "Insufficient Input amount");
-            var balance0Adjusted = new BigIntValue(balanceIn.Mul(FeeRateMax).Sub(amountIn.Mul(feeRate)));
+            var balanceInBigIntValue = new BigIntValue(balanceIn);
+            var balance0Adjusted = balanceInBigIntValue.Mul(FeeRateMax).Sub(amountInBigIntValue.Mul(feeRate));
             var balance1Adjusted = new BigIntValue(balanceOut);
 
             var reserveSymbolInBigIntValue = new BigIntValue(reserveSymbolIn);
