@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+import "aelf/core.proto";
+import "aelf/options.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/timestamp.proto";
+import "acs12.proto";
+
+option csharp_namespace = "Awaken.Contracts.Order";
+
+service AwakenOrderContract {
+  option (aelf.csharp_state) = "Awaken.Contracts.Order.AwakenOrderContractState";
+  option (aelf.base) = "acs12.proto";
+
+  rpc CommitLimitOrder (CommitLimitOrderInput) returns (google.protobuf.Empty) {
+  }
+  rpc CancelLimitOrder (CancelLimitOrderInput) returns (google.protobuf.Empty) {
+  }
+}
+
+enum SideType {
+  BUY = 0;
+  SELL = 1;
+}
+
+message CommitLimitOrderInput {
+  int64 amount_in = 1;
+  string symbol_in = 2;
+  int64 amount_out = 3;
+  string symbol_out = 4;
+  google.protobuf.Timestamp deadline = 5;
+}
+
+message CancelLimitOrderInput {
+  int64 order_id = 1;
+}
+
+message OrderBook {
+  int64 price = 1;
+  string symbol_in = 2;
+  string symbol_out = 3;
+  repeated UserLimitOrder user_limit_orders = 4; // set maxSize
+  int64 next_page_order_book_id = 5;
+}
+
+message UserLimitOrder {
+  int64 amount_in = 1;
+  int64 amount_out = 2;
+  google.protobuf.Timestamp commit_time = 3;
+  google.protobuf.Timestamp deadline = 4;
+  google.protobuf.Timestamp fill_time = 5;
+  aelf.Address maker = 6;
+  int64 amount_in_deal_done = 7;
+  int64 order_id = 8;
+}
+
+message PriceBook {
+  int64 next_page_price = 1;
+  repeated int64 prices = 2; // set maxSize, sort
+  map<int64, bool> price_map = 3; // price exsited
+}

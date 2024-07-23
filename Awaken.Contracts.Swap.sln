@@ -28,6 +28,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Awaken.Contracts.Token", "c
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AElf.Boilerplate.ContractPatcher", "src\AElf.Boilerplate.ContractPatcher\AElf.Boilerplate.ContractPatcher.csproj", "{DCC207EA-842A-4B54-858B-295CAA8947D5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Awaken.Contracts.Order", "contract\Awaken.Contracts.Order\Awaken.Contracts.Order.csproj", "{F2E413F9-D984-47AC-8F01-7FD312D905B7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -69,6 +71,10 @@ Global
 		{DCC207EA-842A-4B54-858B-295CAA8947D5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DCC207EA-842A-4B54-858B-295CAA8947D5}.Release|Any CPU.Build.0 = Release|Any CPU
 		
+		{F2E413F9-D984-47AC-8F01-7FD312D905B7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2E413F9-D984-47AC-8F01-7FD312D905B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2E413F9-D984-47AC-8F01-7FD312D905B7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2E413F9-D984-47AC-8F01-7FD312D905B7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -82,6 +88,7 @@ Global
 		{217599C5-2CF0-411E-97B5-5657739CEE5D} = {21D85A91-5BB8-4912-8107-49435A461AAC}
 		{F72731A8-5803-4362-834F-0C066E64D4CD} = {21D85A91-5BB8-4912-8107-49435A461AAC}
 		{DCC207EA-842A-4B54-858B-295CAA8947D5} = {21D85A91-5BB8-4912-8107-49435A461AAC}
+		{F2E413F9-D984-47AC-8F01-7FD312D905B7} = {5C980166-C987-470D-AEE0-3858A170A903}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {D7426B41-E959-40E4-9ED8-ED8D9C50F133}
