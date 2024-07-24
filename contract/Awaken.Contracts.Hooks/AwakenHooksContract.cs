@@ -132,18 +132,18 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
                     Symbol = swapInput.Path[beginIndex],
                     Amount = amounts[beginIndex]
                 });
-                var swapExactTokensForTokensInput = new Swap.SwapExactTokensForTokensInput()
+                var swapTokensForExactTokensInput = new Swap.SwapTokensForExactTokensInput()
                 {
-                    AmountIn = amounts[beginIndex],
-                    AmountOutMin = amounts[pathCount + 1],
+                    AmountInMax = amounts[beginIndex],
+                    AmountOut = amounts[pathCount + 1],
                     Deadline = swapInput.Deadline,
                     Channel = "hooks",
                     To = pathCount == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self
                 };
                 for (var index = beginIndex; index <= pathCount + 1; index++) {
-                    swapExactTokensForTokensInput.Path.Add(swapInput.Path[index]);
+                    swapTokensForExactTokensInput.Path.Add(swapInput.Path[index]);
                 }
-                Context.SendInline(swapContractAddress, "SwapExactTokensForTokens", swapExactTokensForTokensInput.ToByteString());
+                Context.SendInline(swapContractAddress, "SwapTokensForExactTokens", swapTokensForExactTokensInput.ToByteString());
                 beginIndex = pathCount + 1;
             }
         }
