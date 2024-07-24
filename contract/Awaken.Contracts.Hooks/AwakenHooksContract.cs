@@ -5,6 +5,7 @@ using AElf.Sdk.CSharp;
 using AElf.Types;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
+using TransferFromInput = Awaken.Contracts.Token.TransferFromInput;
 
 namespace Awaken.Contracts.Hooks;
 
@@ -67,33 +68,37 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
         {
             var amounts = GetAmountsOut(swapInput.AmountIn, swapInput.Path, swapInput.FeeRates);
             Assert(amounts[amounts.Count - 1] >= swapInput.AmountOutMin, "Insufficient Output amount");
-            State.TokenContract.TransferFrom.Send(new TransferFromInput
+            TransferFromSender(swapInput.Path[0], swapInput.AmountIn, "Hooks Swap");
+
+            var beginIndex = 0;
+            for (var pathCount = 0; pathCount < swapInput.FeeRates.Count; pathCount++)
             {
-                Symbol = swapInput.Path[0],
-                Amount = swapInput.AmountIn,
-                From = Context.Sender,
-                To = Context.Self,
-                Memo = "Hooks Swap"
-            });
-            for (var pathCount = 0; pathCount < swapInput.Path.Count - 1; pathCount++)
-            {
+                if (pathCount < swapInput.FeeRates.Count - 1 && swapInput.FeeRates[pathCount] == swapInput.FeeRates[pathCount + 1])
+                {
+                    continue;
+                }
+
                 var swapContractAddress = GetSwapContractInfo(swapInput.FeeRates[pathCount]).SwapContractAddress;
                 State.TokenContract.Approve.Send(new ApproveInput()
                 {
                     Spender = swapContractAddress,
-                    Symbol = swapInput.Path[pathCount],
-                    Amount = amounts[pathCount]
+                    Symbol = swapInput.Path[beginIndex],
+                    Amount = amounts[beginIndex]
                 });
                 var swapExactTokensForTokensInput = new Swap.SwapExactTokensForTokensInput()
                 {
-                    AmountIn = amounts[pathCount],
+                    AmountIn = amounts[beginIndex],
                     AmountOutMin = amounts[pathCount + 1],
-                    Path = { swapInput.Path[pathCount], swapInput.Path[pathCount + 1] },
                     Deadline = swapInput.Deadline,
                     Channel = "hooks",
-                    To = pathCount == swapInput.Path.Count - 2 ? swapInput.To : Context.Self
+                    To = pathCount == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self
                 };
+                for (var index = beginIndex; index <= pathCount + 1; index++) {
+                    swapExactTokensForTokensInput.Path.Add(swapInput.Path[index]);
+                }
+
                 Context.SendInline(swapContractAddress, "SwapExactTokensForTokens", swapExactTokensForTokensInput.ToByteString());
+                beginIndex = pathCount + 1;
             }
         }
         Context.Fire(new HooksTransactionCreated()
@@ -112,33 +117,34 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
         {
             var amounts = GetAmountsIn(swapInput.AmountOut, swapInput.Path, swapInput.FeeRates);
             Assert(amounts[0] <= swapInput.AmountInMax, "Excessive Input amount");
-            State.TokenContract.TransferFrom.Send(new TransferFromInput()
+            TransferFromSender(swapInput.Path[0], amounts[0], "Hooks Swap");
+            var beginIndex = 0;
+            for (var pathCount = 0; pathCount < swapInput.FeeRates.Count; pathCount++)
             {
-                Symbol = swapInput.Path[0],
-                Amount = amounts[0],
-                From = Context.Sender,
-                To = Context.Self,
-                Memo = "Hooks Swap"
-            });
-            for (var pathCount = 0; pathCount < swapInput.Path.Count - 1; pathCount++)
-            {
+                if (pathCount < swapInput.FeeRates.Count - 1 && swapInput.FeeRates[pathCount] == swapInput.FeeRates[pathCount + 1])
+                {
+                    continue;
+                }
                 var swapContractAddress = GetSwapContractInfo(swapInput.FeeRates[pathCount]).SwapContractAddress;
                 State.TokenContract.Approve.Send(new ApproveInput()
                 {
                     Spender = swapContractAddress,
-                    Symbol = swapInput.Path[pathCount],
-                    Amount = amounts[pathCount]
+                    Symbol = swapInput.Path[beginIndex],
+                    Amount = amounts[beginIndex]
                 });
                 var swapExactTokensForTokensInput = new Swap.SwapExactTokensForTokensInput()
                 {
-                    AmountIn = amounts[pathCount],
+                    AmountIn = amounts[beginIndex],
                     AmountOutMin = amounts[pathCount + 1],
-                    Path = { swapInput.Path[pathCount], swapInput.Path[pathCount + 1] },
                     Deadline = swapInput.Deadline,
                     Channel = "hooks",
-                    To = pathCount == swapInput.Path.Count - 2 ? swapInput.To : Context.Self
+                    To = pathCount == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self
                 };
+                for (var index = beginIndex; index <= pathCount + 1; index++) {
+                    swapExactTokensForTokensInput.Path.Add(swapInput.Path[index]);
+                }
                 Context.SendInline(swapContractAddress, "SwapExactTokensForTokens", swapExactTokensForTokensInput.ToByteString());
+                beginIndex = pathCount + 1;
             }
         }
         Context.Fire(new HooksTransactionCreated()
@@ -171,34 +177,8 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
         var amounts = AddLiquidity(input.SymbolA, input.SymbolB, input.AmountADesired, input.AmountBDesired,
             input.AmountAMin, input.AmountBMin, input.FeeRate);
         var swapContractAddress = GetSwapContractInfo(input.FeeRate).SwapContractAddress;
-        State.TokenContract.TransferFrom.Send(new TransferFromInput
-        {
-            Symbol = input.SymbolA,
-            Amount = amounts[0],
-            From = Context.Sender,
-            To = Context.Self,
-            Memo = "Hooks AddLiquidity"
-        });
-        State.TokenContract.Approve.Send(new ApproveInput
-        {
-            Symbol = input.SymbolA,
-            Amount = amounts[0],
-            Spender = swapContractAddress
-        });
-        State.TokenContract.TransferFrom.Send(new TransferFromInput
-        {
-            Symbol = input.SymbolB,
-            Amount = amounts[1],
-            From = Context.Sender,
-            To = Context.Self,
-            Memo = "Hooks AddLiquidity"
-        });
-        State.TokenContract.Approve.Send(new ApproveInput
-        {
-            Symbol = input.SymbolB,
-            Amount = amounts[1],
-            Spender = swapContractAddress
-        });
+        TransferFromSenderAndApprove(input.SymbolA, amounts[0], "Hooks AddLiquidity", swapContractAddress);
+        TransferFromSenderAndApprove(input.SymbolB, amounts[1], "Hooks AddLiquidity", swapContractAddress);
         Context.SendInline(swapContractAddress, "AddLiquidity", new AddLiquidityInput
         {
             AmountADesired = amounts[0],
@@ -224,7 +204,7 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
     {
         var swapContract = GetSwapContractInfo(input.FeeRate);
         var lpTokenSymbol = GetTokenPairSymbol(input.SymbolA, input.SymbolB);
-        Context.SendInline(swapContract.LpTokenContractAddress, "TransferFrom", new Token.TransferFromInput
+        Context.SendInline(swapContract.LpTokenContractAddress, "TransferFrom", new TransferFromInput
         {
             Symbol = lpTokenSymbol,
             Amount = input.LiquidityRemove,

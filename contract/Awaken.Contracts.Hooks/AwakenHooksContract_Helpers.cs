@@ -1,6 +1,8 @@
 using System.Linq;
+using AElf.Contracts.MultiToken;
 using Awaken.Contracts.Swap;
 using AElf.Sdk.CSharp;
+using AElf.Types;
 using Google.Protobuf;
 using Google.Protobuf.Collections;
 using Google.Protobuf.WellKnownTypes;
@@ -157,5 +159,28 @@ public partial class AwakenHooksContract
     private void CheckAdminPermission()
     {
         Assert(Context.Sender == State.Admin.Value, "No permission.");
+    }
+
+    private void TransferFromSender(string symbol, long amount, string memo)
+    {
+        State.TokenContract.TransferFrom.Send(new TransferFromInput
+        {
+            Symbol = symbol,
+            Amount = amount,
+            From = Context.Sender,
+            To = Context.Self,
+            Memo = memo
+        });
+    }
+    
+    private void TransferFromSenderAndApprove(string symbol, long amount, string memo, Address spender)
+    {
+        TransferFromSender(symbol, amount, memo);
+        State.TokenContract.Approve.Send(new ApproveInput
+        {
+            Symbol = symbol,
+            Amount = amount,
+            Spender = spender
+        });
     }
 }
