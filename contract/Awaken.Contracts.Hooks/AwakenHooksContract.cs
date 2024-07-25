@@ -90,23 +90,18 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
                     AmountIn = amounts[beginIndex],
                     AmountOutMin = amounts[pathCount + 1],
                     Deadline = swapInput.Deadline,
-                    Channel = "hooks",
+                    Channel = swapInput.Channel,
                     To = pathCount == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self
                 };
                 for (var index = beginIndex; index <= pathCount + 1; index++) {
                     swapExactTokensForTokensInput.Path.Add(swapInput.Path[index]);
                 }
 
-                Context.SendInline(swapContractAddress, "SwapExactTokensForTokens", swapExactTokensForTokensInput.ToByteString());
+                Context.SendInline(swapContractAddress, nameof(SwapExactTokensForTokens), swapExactTokensForTokensInput.ToByteString());
                 beginIndex = pathCount + 1;
             }
         }
-        Context.Fire(new HooksTransactionCreated()
-        {
-            Sender = Context.Sender,
-            MethodName = "SwapExactTokensForTokens",
-            Args = input.ToByteString()
-        });
+        FireHooksTransactionCreatedLogEvent(nameof(SwapExactTokensForTokens), input.ToByteString());
         return new Empty();
     }
 
@@ -137,38 +132,28 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
                     AmountInMax = amounts[beginIndex],
                     AmountOut = amounts[pathCount + 1],
                     Deadline = swapInput.Deadline,
-                    Channel = "hooks",
+                    Channel = swapInput.Channel,
                     To = pathCount == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self
                 };
                 for (var index = beginIndex; index <= pathCount + 1; index++) {
                     swapTokensForExactTokensInput.Path.Add(swapInput.Path[index]);
                 }
-                Context.SendInline(swapContractAddress, "SwapTokensForExactTokens", swapTokensForExactTokensInput.ToByteString());
+                Context.SendInline(swapContractAddress, nameof(SwapTokensForExactTokens), swapTokensForExactTokensInput.ToByteString());
                 beginIndex = pathCount + 1;
             }
         }
-        Context.Fire(new HooksTransactionCreated()
-        {
-            Sender = Context.Sender,
-            MethodName = "SwapTokensForExactTokens",
-            Args = input.ToByteString()
-        });
+        FireHooksTransactionCreatedLogEvent(nameof(SwapTokensForExactTokens), input.ToByteString());
         return new Empty();
     }
     
     public override Empty CreatePair(CreatePairInput input)
     {
         var swapContract = GetSwapContractInfo(input.FeeRate);
-        Context.SendInline(swapContract.SwapContractAddress, "CreatePair", new Swap.CreatePairInput
+        Context.SendInline(swapContract.SwapContractAddress, nameof(CreatePair), new Swap.CreatePairInput
         {
             SymbolPair = input.SymbolPair
         });
-        Context.Fire(new HooksTransactionCreated()
-        {
-            Sender = Context.Sender,
-            MethodName = "CreatePair",
-            Args = input.ToByteString()
-        });
+        FireHooksTransactionCreatedLogEvent(nameof(CreatePair), input.ToByteString());
         return new Empty();
     }
 
@@ -179,7 +164,7 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
         var swapContractAddress = GetSwapContractInfo(input.FeeRate).SwapContractAddress;
         TransferFromSenderAndApprove(input.SymbolA, amounts[0], "Hooks AddLiquidity", swapContractAddress);
         TransferFromSenderAndApprove(input.SymbolB, amounts[1], "Hooks AddLiquidity", swapContractAddress);
-        Context.SendInline(swapContractAddress, "AddLiquidity", new AddLiquidityInput
+        Context.SendInline(swapContractAddress, nameof(AddLiquidity), new AddLiquidityInput
         {
             AmountADesired = amounts[0],
             AmountAMin = amounts[0],
@@ -191,12 +176,7 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
             Deadline = input.Deadline,
             To = input.To
         });
-        Context.Fire(new HooksTransactionCreated()
-        {
-            Sender = Context.Sender,
-            MethodName = "AddLiquidity",
-            Args = input.ToByteString()
-        });
+        FireHooksTransactionCreatedLogEvent(nameof(AddLiquidity), input.ToByteString());
         return new Empty();
     }
 
@@ -217,7 +197,7 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
             Amount = input.LiquidityRemove,
             Spender = swapContract.SwapContractAddress
         });
-        Context.SendInline(swapContract.SwapContractAddress, "RemoveLiquidity", new RemoveLiquidityInput
+        Context.SendInline(swapContract.SwapContractAddress, nameof(RemoveLiquidity), new RemoveLiquidityInput
         {
             SymbolA = input.SymbolA,
             SymbolB = input.SymbolB,
@@ -227,12 +207,17 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
             Deadline = input.Deadline,
             To = input.To
         });
+        FireHooksTransactionCreatedLogEvent(nameof(RemoveLiquidity), input.ToByteString());
+        return new Empty();
+    }
+
+    private void FireHooksTransactionCreatedLogEvent(string methodName, ByteString args)
+    {
         Context.Fire(new HooksTransactionCreated()
         {
             Sender = Context.Sender,
-            MethodName = "RemoveLiquidity",
-            Args = input.ToByteString()
+            MethodName = methodName,
+            Args = args
         });
-        return new Empty();
     }
 }

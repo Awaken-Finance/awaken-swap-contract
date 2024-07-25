@@ -23,7 +23,7 @@ public partial class AwakenHooksContract
     private RepeatedField<long> GetAmountsOut(long amountIn, RepeatedField<string> path, RepeatedField<long> feeRates)
     {
         Assert(path.Count >= 2, "Invalid path");
-        Assert(path.Count == feeRates.Count + 1, "invalid feeRates");
+        Assert(path.Count == feeRates.Count + 1, "Invalid feeRates");
         var amounts = new RepeatedField<long> {amountIn};
         for (var i = 0; i < path.Count - 1; i++)
         {
@@ -42,12 +42,11 @@ public partial class AwakenHooksContract
     private RepeatedField<long> GetAmountsIn(long amountOut, RepeatedField<string> path, RepeatedField<long> feeRates)
     {
         Assert(path.Count >= 2, "Invalid path");
-        Assert(path.Count == feeRates.Count + 1, "invalid feeRates");
+        Assert(path.Count == feeRates.Count + 1, "Invalid feeRates");
         var amounts = new RepeatedField<long>() {amountOut};
         for (var i = path.Count - 1; i > 0; i--)
         {
             var swapContract = GetSwapContractInfo(feeRates[i - 1]);
-            Assert(swapContract != null, "feeRate not existed");
             var amountIn = Context.Call<Int64Value>(swapContract.SwapContractAddress, "GetAmountIn", new GetAmountInInput()
             {
                 AmountOut = amounts[0],
@@ -74,11 +73,6 @@ public partial class AwakenHooksContract
                     LpTokenContractAddress = contractInfo.LpTokenContractAddress
                 };
                 swapContractInfoList.SwapContracts.Add(swapContractInfo);
-            }
-            else
-            {
-                swapContractInfo.SwapContractAddress = contractInfo.SwapContractAddress;
-                swapContractInfo.LpTokenContractAddress = contractInfo.LpTokenContractAddress;
             }
         }
         State.SwapContractInfoList.Value = swapContractInfoList;
