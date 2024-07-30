@@ -17,6 +17,27 @@ service AwakenOrderContract {
   }
   rpc CancelLimitOrder (CancelLimitOrderInput) returns (google.protobuf.Empty) {
   }
+  rpc FillLimitOrder (FillLimitOrderInput) returns (google.protobuf.Empty) {
+  }
+  // view
+  rpc GetFillResult (GetFillResultInput) returns (GetFillResultOutput) {
+    option (aelf.is_view) = true;
+  }
+
+  rpc GetAllReverse (GetAllReverseInput) returns (GetAllReverseOutput) {
+    option (aelf.is_view) = true;
+  }
+}
+message GetAllReverseInput {
+  string symbol_a = 1;
+  string symbol_b = 2;
+}
+
+message GetAllReverseOutput {
+  string symbol_a = 1;
+  string symbol_b = 2;
+  int64 reverse_a = 3;
+  int64 reverse_b = 4;
 }
 
 enum SideType {
@@ -36,12 +57,29 @@ message CancelLimitOrderInput {
   int64 order_id = 1;
 }
 
-message OrderBook {
-  int64 price = 1;
+message FillLimitOrderInput {
+  int64 amount_in = 1;
   string symbol_in = 2;
-  string symbol_out = 3;
-  repeated UserLimitOrder user_limit_orders = 4; // set maxSize
-  int64 next_page_order_book_id = 5;
+  int64 amount_out_min = 3;
+  string symbol_out = 4;
+  aelf.Address to = 5;
+}
+message GetFillResultInput {
+  int64 amount_in = 1;
+  string symbol_in = 2;
+  int64 amount_out_min = 3;
+  string symbol_out = 4;
+}
+
+message GetFillResultOutput {
+  repeated UserLimitOrder fill_orders = 1;
+}
+
+
+message OrderBook {
+  int64 next_page_order_book_id = 1;
+  repeated UserLimitOrder user_limit_orders = 2; // set maxSize
+  int64 order_book_id = 3;
 }
 
 message UserLimitOrder {
@@ -51,12 +89,48 @@ message UserLimitOrder {
   google.protobuf.Timestamp deadline = 4;
   google.protobuf.Timestamp fill_time = 5;
   aelf.Address maker = 6;
-  int64 amount_in_deal_done = 7;
+  int64 amount_in_filled = 7;
   int64 order_id = 8;
 }
 
 message PriceBook {
-  int64 next_page_price = 1;
-  repeated int64 prices = 2; // set maxSize, sort
-  map<int64, bool> price_map = 3; // price exsited
+  int64 next_page_price_book_id = 1;
+  PriceList priceList = 2;
+  int64 price_book_id = 3;
+}
+
+message PriceList {
+  repeated int64 prices = 1;
+}
+
+message LimitOrderCreated {
+  option (aelf.is_event) = true;
+  int64 amount_in = 1;
+  string symbol_in = 2;
+  int64 amount_out = 3;
+  string symbol_out = 4;
+  google.protobuf.Timestamp deadline = 5;
+  google.protobuf.Timestamp commit_time = 6;
+  int64 order_id = 7;
+  aelf.Address maker = 8;
+}
+
+message LimitOrderFilled {
+  option (aelf.is_event) = true;
+  int64 order_id = 1;
+  google.protobuf.Timestamp fill_time = 2;
+  int64 amount_in_filled = 3;
+  int64 amount_out_filled = 4;
+}
+
+message LimitOrderCancelled {
+  option (aelf.is_event) = true;
+  int64 order_id = 1;
+  google.protobuf.Timestamp cancel_time = 2;
+}
+
+message LimitOrderRemoved {
+  option (aelf.is_event) = true;
+  int64 order_id = 1;
+  google.protobuf.Timestamp remove_time = 2;
 }
