@@ -13,19 +13,10 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
     public override Empty CommitLimitOrder(CommitLimitOrderInput input)
     {
         // check price， tradePair existed
-        CheckAllowanceAndBalance(input.SymbolIn, input.AmountIn);
-        var symbolInDecimal = GetTokenDecimal(input.SymbolIn);
-        var symbolOutDecimal = GetTokenDecimal(input.SymbolOut);
-        var amountOutBigIntValue = new BigIntValue(input.AmountOut);
-        var weightPrice = amountOutBigIntValue.Mul(IntPow(10, 8 + symbolInDecimal - symbolOutDecimal))
-            .Div(input.AmountIn);
-        // four decimal places price
-        var accuratePrice = weightPrice.Div(IntPow(10, 4));
-        if (long.TryParse(accuratePrice.Value, out var price))
-        {
-            throw new AssertionException($"Failed to parse {accuratePrice.Value}");
-        }
-        var realAmountOutStr = accuratePrice.Mul(input.AmountIn).Div(IntPow(10, 4)).Value;
+        AssertAllowanceAndBalance(input.SymbolIn, input.AmountIn);
+        CalculatePrice(input.SymbolIn, input.SymbolOut, input.AmountIn, input.AmountOut, true, out var price);
+        BigIntValue amountInBigValue = new BigIntValue(input.AmountIn);
+        var realAmountOutStr = amountInBigValue.Mul(price).Div(PriceMultiple).Value;
         if (long.TryParse(realAmountOutStr, out var realAmountOut))
         {
             throw new AssertionException($"Failed to parse {realAmountOutStr}");
@@ -192,23 +183,6 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         }).Decimals;
     }
 
-    private void CheckAllowanceAndBalance(string symbol, long amount)
-    {
-        var allowance = State.TokenContract.GetAllowance.Call(new GetAllowanceInput
-        {
-            Spender = Context.Self,
-            Owner = Context.Sender,
-            Symbol = symbol
-        });
-        Assert(allowance.Allowance >= amount, "Allowance not enough");
-        var balance = State.TokenContract.GetBalance.Call(new GetBalanceInput()
-        {
-            Owner = Context.Sender,
-            Symbol = symbol
-        });
-        Assert(balance.Balance >= amount, "Balance not enough");
-    }
-
     public override Empty CancelLimitOrder(CancelLimitOrderInput input)
     {
         var orderBookId = State.OrderIdToOrderBookIdMap[input.OrderId];
@@ -226,12 +200,215 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         return base.CancelLimitOrder(input);
     }
 
+    private void CalculatePrice(string symbolIn, string symbolOut, long amountIn, long amountOut, bool erasePlaceDecimal, out long price)
+    {
+        var symbolInDecimal = GetTokenDecimal(symbolIn);
+        var symbolOutDecimal = GetTokenDecimal(symbolOut);
+        var amountInBigIntValue = new BigIntValue(amountIn);
+        var weightPrice = amountInBigIntValue.Mul(IntPow(10, 8 + symbolOutDecimal - symbolInDecimal))
+            .Div(amountOut);
+        if (long.TryParse(weightPrice.Value, out price))
+        {
+            throw new AssertionException($"Failed to parse {weightPrice.Value}");
+        }
+        if (erasePlaceDecimal)
+        {
+            price = price / ErasePriceMultiple * ErasePriceMultiple;
+        }
+    }
+
     public override Empty FillLimitOrder(FillLimitOrderInput input)
     {
         var headerPriceBookId = State.HeaderPriceBookIdMap[input.SymbolOut][input.SymbolIn];
-        Assert(headerPriceBookId > 0, "No price book id.");
+        Assert(headerPriceBookId > 0, "Price book id not existed");
         var headerPriceBook = State.PriceBookMap[headerPriceBookId];
-        Assert(headerPriceBook != null, "No price book.");
-        return base.FillLimitOrder(input);
+        Assert(headerPriceBook?.PriceList != null, "Price book not existed.");
+        CalculatePrice(input.SymbolOut, input.SymbolIn, input.AmountOutMin, 
+            input.AmountIn, false, out var buyPrice);
+        var orderCount = 0;
+        var amountInUsed = 0L;
+        var priceBook = headerPriceBook;
+        
+        var breakOuterLoop = false;
+        while (!breakOuterLoop)
+        {
+            var removePricesCount = 0;
+            foreach (var sellPrice in priceBook.PriceList.Prices)
+            {
+                if (buyPrice < sellPrice)
+                {
+                    breakOuterLoop = true;
+                    break;
+                }
+                var headerOrderBookId = State.OrderBookIdMap[input.SymbolOut][input.SymbolIn][sellPrice];
+                var headerOrderBook = State.OrderBookMap[headerOrderBookId];
+                var curOrderBook = FillOrderBookList(headerOrderBook, input.To,input.AmountIn - amountInUsed, 
+                    MaxFillOrderCountEachSwap - orderCount,  out var amountInFilled, out var orderFilledCount, true);
+                amountInUsed += amountInFilled;
+                orderCount += orderFilledCount;
+                if (headerOrderBook.OrderBookId != curOrderBook.OrderBookId)
+                {
+                    State.OrderBookIdMap[input.SymbolOut][input.SymbolIn][sellPrice] = curOrderBook.OrderBookId;
+                }
+                if (curOrderBook.UserLimitOrders.Count == 0 && curOrderBook.NextPageOrderBookId == 0)
+                {
+                    removePricesCount++;
+                }
+                
+                if (amountInUsed >= input.AmountIn || orderCount >= MaxFillOrderCountEachSwap)
+                {
+                    breakOuterLoop = true;
+                    break;
+                }
+            }
+            
+            if (priceBook.PriceList.Prices.Count == removePricesCount)
+            {
+                State.PriceBookMap.Remove(priceBook.PriceBookId);
+                if (priceBook.NextPagePriceBookId > 0)
+                {
+                    State.HeaderPriceBookIdMap[input.SymbolOut][input.SymbolIn] = priceBook.NextPagePriceBookId;
+                    priceBook = State.PriceBookMap[priceBook.NextPagePriceBookId];
+                    continue;
+                }
+
+                State.HeaderPriceBookIdMap[input.SymbolOut][input.SymbolIn] = 0;
+                breakOuterLoop = true;
+                continue;
+            }
+            if (removePricesCount == 0)
+            {
+                continue;
+            }
+            priceBook.PriceList = new PriceList
+            {
+                Prices = { priceBook.PriceList.Prices.Skip(removePricesCount) }
+            };
+        }
+        return new Empty();
+    }
+    
+    private OrderBook FillOrderBookList(OrderBook headerOrderBook, Address to, long maxAmountInFilled, int maxFillOrderCount, 
+        out long amountInFilled, out int orderFilledCount, bool isView = false)
+    {
+        amountInFilled = 0;
+        orderFilledCount = 0;
+        var orderBook = headerOrderBook;
+        while (amountInFilled < maxAmountInFilled && orderFilledCount < maxFillOrderCount)
+        {
+            if (orderBook.UserLimitOrders.Count == 0 && orderBook.NextPageOrderBookId == 0)
+            {
+                return orderBook;
+            }
+            FillOrderBook(orderBook, to, maxAmountInFilled - amountInFilled, maxFillOrderCount - orderFilledCount,
+                out var amountInFilledThisBook, out var orderFilledCountThisBook, isView);
+            amountInFilled += amountInFilledThisBook;
+            orderFilledCount += orderFilledCountThisBook;
+            if (orderBook.UserLimitOrders.Count == 0 && orderBook.NextPageOrderBookId > 0)
+            {
+                if (!isView)
+                {
+                    State.OrderBookMap.Remove(orderBook.OrderBookId);
+                }
+                orderBook = State.OrderBookMap[orderBook.NextPageOrderBookId];
+            }
+        }
+
+        return orderBook;
+    }
+
+    private void FillOrderBook(OrderBook orderBook, Address to, long maxAmountInFilled, int maxFillOrderCount, out long amountInFilled, 
+        out int orderFilledCount, bool isView = false)
+    {
+        amountInFilled = 0;
+        orderFilledCount = 0;
+        foreach (var userLimitOrder in orderBook.UserLimitOrders)
+        {
+            var checkoutResult = CheckAllowanceAndBalance(userLimitOrder.Maker, orderBook.SymbolIn, userLimitOrder.AmountIn);
+            if (!checkoutResult || userLimitOrder.Deadline < Context.CurrentBlockTime || userLimitOrder.AmountInFilled >= userLimitOrder.AmountIn)
+            {
+                orderFilledCount++;
+                if (!isView)
+                {
+                    Context.Fire(new LimitOrderRemoved
+                    {
+                        OrderId = userLimitOrder.OrderId,
+                        RemoveTime = Context.CurrentBlockTime
+                    });
+                }
+                continue;
+            }
+            var amountIn = Math.Min(maxAmountInFilled - amountInFilled, userLimitOrder.AmountIn - userLimitOrder.AmountInFilled);
+            var amountOutStr = new BigIntValue(userLimitOrder.AmountOut).Mul(amountIn).Div(userLimitOrder.AmountOut).Value;
+            if (!long.TryParse(amountOutStr, out var amountOut))
+            {
+                throw new AssertionException($"Failed to parse {amountOutStr}");
+            }
+            amountInFilled += amountIn;
+            if (amountIn == userLimitOrder.AmountIn - userLimitOrder.AmountInFilled)
+            {
+                orderFilledCount++;
+            }
+
+            if (!isView)
+            {
+                SwapInternal(userLimitOrder.Maker, to, orderBook.SymbolIn, orderBook.SymbolOut, amountIn, amountOut);
+                userLimitOrder.AmountInFilled += amountIn;
+                userLimitOrder.FillTime = Context.CurrentBlockTime;
+                Context.Fire(new LimitOrderFilled
+                {
+                    OrderId = userLimitOrder.OrderId,
+                    AmountInFilled = amountIn,
+                    AmountOutFilled = amountOut,
+                    FillTime = Context.CurrentBlockTime
+                });
+            }
+            
+            if (amountInFilled >= maxAmountInFilled || orderFilledCount >= maxFillOrderCount)
+            {
+                break;
+            }
+        }
+
+        if (!isView)
+        {
+            for (var i = 0; i < orderFilledCount; i++) {
+                orderBook.UserLimitOrders.RemoveAt(0);
+            }
+        }
+    }
+
+    private void SwapInternal(Address maker, Address taker, string symbolIn, string symbolOut, long amountIn, long amountOut)
+    {
+        State.TokenContract.TransferFrom.Send(new TransferFromInput
+        {
+            From = maker,
+            To = Context.Self,
+            Symbol = symbolIn,
+            Amount = amountIn,
+            Memo = "Fill Limit Order"
+        });
+        State.TokenContract.Transfer.Send(new TransferInput
+        {
+            To = taker,
+            Amount = amountIn,
+            Symbol = symbolIn,
+            Memo = "Fill Limit Order"
+        });
+        State.TokenContract.TransferFrom.Send(new TransferFromInput
+        {
+            From = Context.Sender,
+            To = Context.Self,
+            Symbol = symbolOut,
+            Amount = amountOut,
+            Memo = "Fill Limit Order"
+        });
+        State.TokenContract.Transfer.Send(new TransferInput
+        {
+            To = maker,
+            Amount = amountOut,
+            Symbol = symbolOut,
+            Memo = "Fill Limit Order"
+        });
     }
 }

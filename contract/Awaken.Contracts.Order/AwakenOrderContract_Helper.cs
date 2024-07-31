@@ -1,4 +1,6 @@
 using System.Linq;
+using AElf.Contracts.MultiToken;
+using AElf.Types;
 
 namespace Awaken.Contracts.Order;
 
@@ -31,5 +33,42 @@ public partial class AwakenOrderContract
             result *= x;
         }
         return result;
+    }
+    
+    private void AssertAllowanceAndBalance(string symbol, long amount)
+    {
+        var allowance = State.TokenContract.GetAllowance.Call(new GetAllowanceInput
+        {
+            Spender = Context.Self,
+            Owner = Context.Sender,
+            Symbol = symbol
+        });
+        Assert(allowance.Allowance >= amount, "Allowance not enough");
+        var balance = State.TokenContract.GetBalance.Call(new GetBalanceInput()
+        {
+            Owner = Context.Sender,
+            Symbol = symbol
+        });
+        Assert(balance.Balance >= amount, "Balance not enough");
+    }
+    
+    private bool CheckAllowanceAndBalance(Address owner, string symbol, long amount)
+    {
+        var allowance = State.TokenContract.GetAllowance.Call(new GetAllowanceInput
+        {
+            Spender = Context.Self,
+            Owner = owner,
+            Symbol = symbol
+        });
+        if (allowance.Allowance < amount)
+        {
+            return false;
+        }
+        var balance = State.TokenContract.GetBalance.Call(new GetBalanceInput()
+        {
+            Owner = owner,
+            Symbol = symbol
+        });
+        return balance.Balance > amount;
     }
 }

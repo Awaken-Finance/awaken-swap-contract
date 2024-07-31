@@ -80,6 +80,8 @@ message OrderBook {
   int64 next_page_order_book_id = 1;
   repeated UserLimitOrder user_limit_orders = 2; // set maxSize
   int64 order_book_id = 3;
+  string symbol_in = 4;
+  string symbol_out = 5;
 }
 
 message UserLimitOrder {
