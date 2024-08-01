@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <IsContract>true</IsContract>
+        <RootNamespace>Awaken.Contracts.Hooks</RootNamespace>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+        <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+        <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ContractBase Include="..\..\protobuf\acs2.proto">
+            <Link>Protobuf\Proto\reference\acs2.proto</Link>
+        </ContractBase>
+        <ContractBase Include="..\..\protobuf\acs12.proto">
+            <Link>Protobuf\Proto\acs12.proto</Link>
+        </ContractBase>
+        <ContractBase Include="..\..\protobuf\transaction_fee.proto">
+            <Link>Protobuf\Proto\reference\transaction_fee.proto</Link>
+        </ContractBase>
+        <ContractBase Include="..\..\protobuf\authority_info.proto">
+            <Link>Protobuf\Proto\reference\authority_info.proto</Link>
+        </ContractBase>
+        <ContractReference Include="..\..\protobuf\token_contract.proto">
+            <Link>Protobuf\Proto\reference\token_contract.proto</Link>
+        </ContractReference>
+        <ContractReference Include="..\..\protobuf\awaken_token_contract.proto">
+            <Link>Protobuf\Proto\reference\awaken_token_contract.proto</Link>
+        </ContractReference>
+        <ContractReference Include="..\..\protobuf\awaken_investment_contract.proto">
+            <Link>Protobuf\Proto\reference\awaken_investment_contract.proto</Link>
+        </ContractReference>
+        <ContractReference Include="..\..\protobuf\awaken_swap_contract.proto">
+            <Link>Protobuf\Proto\reference\awaken_swap_contract.proto</Link>
+        </ContractReference>
+        <ContractReference Include="..\..\protobuf\acs0.proto">
+            <Link>Protobuf\Proto\reference\acs0.proto</Link>
+        </ContractReference>
+    </ItemGroup>
+    <ItemGroup>
+        <ContractCode Include="..\..\protobuf\awaken_hooks_contract.proto">
+            <Link>Protobuf\Proto\awaken_hooks_contract.proto</Link>
+        </ContractCode>
+        <ContractMessage Include="..\..\protobuf\authority_info.proto">
+            <Link>Protobuf\Proto\reference\authority_info.proto</Link>
+        </ContractMessage>
+    </ItemGroup>
+</Project>
