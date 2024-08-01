@@ -1,0 +1,84 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <RootNamespace>Awaken.Contracts.Hooks</RootNamespace>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <NoWarn>0436</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="coverlet.msbuild" Version="2.5.1" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.3.0" />
+        <PackageReference Include="Shouldly" Version="3.0.2" />
+        <PackageReference Include="xunit" Version="2.4.1" />
+        <PackageReference Include="xunit.runner.console" Version="2.4.1" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1" />
+        <PackageReference Include="coverlet.collector" Version="3.1.0" />
+        <PackageReference Include="AElf.Contracts.CrossChain" Version="1.6.0" />
+        <PackageReference Include="AElf.Contracts.Genesis" Version="1.6.0" />
+        <PackageReference Include="AElf.Contracts.MultiToken" Version="1.6.0" />
+        <PackageReference Include="AElf.Contracts.Election" Version="1.6.0" />
+        <PackageReference Include="AElf.Contracts.Consensus.AEDPoS" Version="1.6.0" />
+    </ItemGroup>
+    <ItemGroup>
+        <ContractMessage Include="..\..\protobuf\authority_info.proto">
+            <Link>Protobuf\Proto\authority_info.proto</Link>
+        </ContractMessage>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="AElf.ContractTestKit" Version="1.6.0" />
+        <PackageReference Include="AElf.ContractTestBase" Version="1.6.0" />
+    </ItemGroup>
+    <ItemGroup>
+        <ContractStub Include="..\..\protobuf\acs0.proto">
+            <Link>Protobuf\Proto\acs0.proto</Link>
+        </ContractStub>
+        <ContractStub Include="..\..\protobuf\acs1.proto">
+            <Link>Protobuf\Proto\acs1.proto</Link>
+        </ContractStub>
+        <ContractStub Include="..\..\protobuf\acs12.proto">
+            <Link>Protobuf\Proto\acs12.proto</Link>
+        </ContractStub>
+        <ContractStub Include="..\..\protobuf\acs2.proto">
+            <Link>Protobuf\Proto\acs2.proto</Link>
+        </ContractStub>
+        <ContractStub Include="..\..\protobuf\acs3.proto">
+            <Link>Protobuf\Proto\acs3.proto</Link>
+        </ContractStub>
+        <ContractStub Include="..\..\protobuf\transaction_fee.proto">
+            <Link>Protobuf\Proto\transaction_fee.proto</Link>
+        </ContractStub>
+        <ContractStub Include="..\..\protobuf\awaken_swap_contract.proto">
+            <Link>Protobuf\Proto\awaken_swap_contract.proto</Link>
+        </ContractStub>
+        <ContractStub Include="..\..\protobuf\token_contract.proto">
+            <Link>Protobuf\Proto\token_contract.proto</Link>
+        </ContractStub>
+        <ContractStub Include="..\..\protobuf\token_contract_impl.proto">
+            <Link>Protobuf\Proto\token_contract_impl.proto</Link>
+        </ContractStub>
+        <ContractStub Include="..\..\protobuf\awaken_token_contract.proto">
+            <Link>Protobuf\Proto\awaken_token_contract.proto</Link>
+        </ContractStub>
+        <ContractStub Include="..\..\protobuf\parliament_contract.proto">
+            <Link>Protobuf\Proto\parliament_contract.proto</Link>
+        </ContractStub>
+        <ContractStub Include="..\..\protobuf\parliament_contract_impl.proto">
+            <Link>Protobuf\Proto\parliament_contract_impl.proto</Link>
+        </ContractStub>
+        <ContractStub Include="..\..\protobuf\awaken_hooks_contract.proto">
+            <Link>Protobuf\Proto\awaken_hooks_contract.proto</Link>
+        </ContractStub>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\contract\Awaken.Contracts.Hooks\Awaken.Contracts.Hooks.csproj" />
+        <ProjectReference Include="..\..\contract\Awaken.Contracts.Swap\Awaken.Contracts.Swap.csproj" />
+        <ProjectReference Include="..\..\contract\Awaken.Contracts.Token\Awaken.Contracts.Token.csproj" />
+        <ProjectReference Include="..\..\src\AElf.Boilerplate.TestBase\AElf.Boilerplate.TestBase.csproj" />
+    </ItemGroup>
+</Project>
