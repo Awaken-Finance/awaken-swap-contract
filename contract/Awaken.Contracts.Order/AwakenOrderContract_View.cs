@@ -28,7 +28,7 @@ public partial class AwakenOrderContract
                 }
                 var headerOrderBookId = State.OrderBookIdMap[input.SymbolOut][input.SymbolIn][sellPrice];
                 var headerOrderBook = State.OrderBookMap[headerOrderBookId];
-                FillOrderBookList(headerOrderBook, null,input.AmountIn - amountInUsed, 
+                TryFillOrderBookList(headerOrderBook, result.FillOrders,input.AmountIn - amountInUsed, 
                     MaxFillOrderCountEachSwap - orderCount,  out var amountInFilled, out var orderFilledCount);
                 amountInUsed += amountInFilled;
                 orderCount += orderFilledCount;
