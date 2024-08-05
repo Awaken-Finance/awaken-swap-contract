@@ -45,6 +45,9 @@ service AwakenHooksContract {
   rpc GetAmountsIn (GetAmountsInInput) returns (GetAmountsInOutput) {
     option (aelf.is_view) = true;
   }
+  rpc GetAllReverse (GetAllReverseInput) returns (GetAllReverseOutput) {
+    option (aelf.is_view) = true;
+  }
 }
 
 // Inputs
@@ -132,6 +135,11 @@ message SwapTokensForExactTokens {
   repeated int64 fee_rates = 7;
 }
 
+message GetAllReverseInput {
+  string symbol_a = 1;
+  string symbol_b = 2;
+}
+
 // Outputs
 message AddLiquidityOutput {
   string symbol_a = 1;
@@ -166,6 +174,13 @@ message GetAmountsOutOutput{
 
 message GetAmountsInOutput{
   repeated int64 amount = 1;
+}
+
+message GetAllReverseOutput {
+  string symbol_a = 1;
+  string symbol_b = 2;
+  int64 reverse_a = 3;
+  int64 reverse_b = 4;
 }
 
 //event

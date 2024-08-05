@@ -5,6 +5,10 @@ namespace Awaken.Contracts.Order;
 
 public partial class AwakenOrderContractState : ContractState
 {
+    public SingletonState<bool> Initialized { get; set; }
+    public SingletonState<Address> Admin { get; set; }
+    public SingletonState<OrderBookConfig> OrderBookConfig { get; set; }
+
     // key = symbolIn, symbolOut, price(amountOut/amountIn); value = orderBookId
     public MappedState<string, string, long, long> OrderBookIdMap { get; set; }
     public SingletonState<long> LastOrderBookId { get; set; }

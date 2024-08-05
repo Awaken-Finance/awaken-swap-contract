@@ -38,6 +38,9 @@
         <ContractReference Include="..\..\protobuf\awaken_swap_contract.proto">
             <Link>Protobuf\Proto\reference\awaken_swap_contract.proto</Link>
         </ContractReference>
+        <ContractReference Include="..\..\protobuf\awaken_order_contract.proto">
+            <Link>Protobuf\Proto\reference\awaken_order_contract.proto</Link>
+        </ContractReference>
         <ContractReference Include="..\..\protobuf\acs0.proto">
             <Link>Protobuf\Proto\reference\acs0.proto</Link>
         </ContractReference>
