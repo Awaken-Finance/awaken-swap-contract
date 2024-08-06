@@ -21,6 +21,10 @@ service AwakenOrderContract {
   }
   rpc SetOrderBookConfig (SetOrderBookConfigInput) returns (google.protobuf.Empty) {
   }
+  rpc AddFillOrderWhiteList (aelf.Address) returns (google.protobuf.Empty) {
+  }
+  rpc RemoveFillOrderWhiteList (aelf.Address) returns (google.protobuf.Empty) {
+  }
 
   rpc CommitLimitOrder (CommitLimitOrderInput) returns (google.protobuf.Empty) {
   }
@@ -29,9 +33,6 @@ service AwakenOrderContract {
   rpc FillLimitOrder (FillLimitOrderInput) returns (google.protobuf.Empty) {
   }
   // view
-  rpc GetFillLimitOrder (GetFillLimitOrderInput) returns (GetFillLimitOrderOutput) {
-    option (aelf.is_view) = true;
-  }
 
   rpc GetFillResult (GetFillResultInput) returns (GetFillResultOutput) {
     option (aelf.is_view) = true;
@@ -44,10 +45,35 @@ service AwakenOrderContract {
   rpc GetAdmin (google.protobuf.Empty) returns (aelf.Address) {
     option (aelf.is_view) = true;
   }
+
+  rpc GetFillOrderWhiteList (google.protobuf.Empty) returns (WhiteList) {
+    option (aelf.is_view) = true;
+  }
+  
   rpc GetHooksContract (google.protobuf.Empty) returns (aelf.Address) {
     option (aelf.is_view) = true;
   }
   rpc GetOrderBookConfig (google.protobuf.Empty) returns (GetOrderBookConfigOutput) {
+    option (aelf.is_view) = true;
+  }
+  
+  rpc GetPriceBook (google.protobuf.Int64Value) returns (PriceBook) {
+    option (aelf.is_view) = true;
+  }
+
+  rpc GetOrderBook (google.protobuf.Int64Value) returns (OrderBook) {
+    option (aelf.is_view) = true;
+  }
+
+  rpc GetUserLimitOrder (google.protobuf.Int64Value) returns (UserLimitOrder) {
+    option (aelf.is_view) = true;
+  }
+
+  rpc GetOrderBookIdByOrderId (google.protobuf.Int64Value) returns (google.protobuf.Int64Value) {
+    option (aelf.is_view) = true;
+  }
+
+  rpc CalculatePrice (CalculatePriceInput) returns (google.protobuf.Int64Value) {
     option (aelf.is_view) = true;
   }
 }
@@ -75,9 +101,8 @@ message OrderBookConfig {
   int64 min_order_value_in_usdt = 6;
 }
 
-enum SideType {
-  BUY = 0;
-  SELL = 1;
+message WhiteList {
+  repeated aelf.Address value = 1;
 }
 
 message CommitLimitOrderInput {
@@ -95,26 +120,15 @@ message CancelLimitOrderInput {
 message FillLimitOrderInput {
   int64 amount_in = 1;
   string symbol_in = 2;
-  int64 max_sell_price = 3;
+  int64 max_open_interval_price = 3; 
   string symbol_out = 4;
   aelf.Address to = 5;
-}
-
-message GetFillLimitOrderInput {
-  int64 amount_in = 1;
-  string symbol_in = 2;
-  int64 amount_out_min = 3;
-  string symbol_out = 4;
-}
-
-message GetFillLimitOrderOutput {
-  repeated UserLimitOrder fill_orders = 1;
 }
 
 message GetBestSellPriceInput {
   string symbol_in = 1;
   string symbol_out = 2;
-  int64 min_price = 3; // open interval
+  int64 min_open_interval_price = 3;
 }
 
 message GetBestSellPriceOutput {
@@ -125,8 +139,8 @@ message GetFillResultInput {
   int64 amount_in = 1;
   string symbol_in = 2;
   string symbol_out = 3;
-  int64 min_price = 4; // close interval
-  int64 max_price = 5; // open interval
+  int64 min_close_interval_price = 4;
+  int64 max_open_interval_price = 5;
 }
 
 message GetFillResultOutput {
@@ -136,6 +150,12 @@ message GetFillResultOutput {
   int32 order_filled_count = 4;
 }
 
+message CalculatePriceInput {
+  string symbol_in = 1;
+  string symbol_out = 2;
+  int64 amount_in = 3;
+  int64 amount_out = 4;
+}
 
 message OrderBook {
   int64 next_page_order_book_id = 1;
@@ -154,6 +174,7 @@ message UserLimitOrder {
   aelf.Address maker = 6;
   int64 amount_in_filled = 7;
   int64 order_id = 8;
+  int64 amount_out_filled = 9;
 }
 
 message PriceBook {
@@ -184,6 +205,7 @@ message LimitOrderFilled {
   google.protobuf.Timestamp fill_time = 2;
   int64 amount_in_filled = 3;
   int64 amount_out_filled = 4;
+  aelf.Address taker = 5;
 }
 
 message LimitOrderCancelled {

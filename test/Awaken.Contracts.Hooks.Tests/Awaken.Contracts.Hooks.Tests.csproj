@@ -73,10 +73,14 @@
         <ContractStub Include="..\..\protobuf\awaken_hooks_contract.proto">
             <Link>Protobuf\Proto\awaken_hooks_contract.proto</Link>
         </ContractStub>
+        <ContractStub Include="..\..\protobuf\awaken_order_contract.proto">
+            <Link>Protobuf\Proto\awaken_order_contract.proto</Link>
+        </ContractStub>
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\..\contract\Awaken.Contracts.Hooks\Awaken.Contracts.Hooks.csproj" />
+        <ProjectReference Include="..\..\contract\Awaken.Contracts.Order\Awaken.Contracts.Order.csproj" />
         <ProjectReference Include="..\..\contract\Awaken.Contracts.Swap\Awaken.Contracts.Swap.csproj" />
         <ProjectReference Include="..\..\contract\Awaken.Contracts.Token\Awaken.Contracts.Token.csproj" />
         <ProjectReference Include="..\..\src\AElf.Boilerplate.TestBase\AElf.Boilerplate.TestBase.csproj" />

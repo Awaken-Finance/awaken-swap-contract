@@ -13,7 +13,7 @@ using Xunit;
 
 namespace Awaken.Contracts.Hooks;
 
-public class AwakenHooksContractTests : AwakenHooksContractTestBase
+public partial class AwakenHooksContractTests : AwakenHooksContractTestBase
 {
     [Fact]
     public async Task InitializeTest()

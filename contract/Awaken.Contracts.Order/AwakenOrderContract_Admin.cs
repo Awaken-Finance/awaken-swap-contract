@@ -15,6 +15,10 @@ public partial class AwakenOrderContract
         Assert(Context.Sender == author, "No permission.");
         Assert(!input.HooksContractAddress.Value.IsNullOrEmpty(), "Invalid hooks contract address.");
         State.HooksContract.Value = input.HooksContractAddress;
+        State.FillOrderWhiteList.Value = new WhiteList
+        {
+            Value = { input.HooksContractAddress }
+        };
         State.TokenContract.Value =
             Context.GetContractAddressByName(SmartContractConstants.TokenContractSystemName);
         State.Admin.Value = input.Admin ?? Context.Sender;
@@ -102,7 +106,33 @@ public partial class AwakenOrderContract
             OrderBookConfig = State.OrderBookConfig.Value
         };
     }
-    
+
+    public override Empty AddFillOrderWhiteList(Address input)
+    {
+        Assert(input != null && !input.Value.IsNullOrEmpty(), "Invalid input.");
+        AssertSenderIsAdmin();
+        State.FillOrderWhiteList.Value ??= new WhiteList();
+        Assert(!State.FillOrderWhiteList.Value.Value.Contains(input), "Address is exist");
+
+        State.FillOrderWhiteList.Value.Value.Add(input);
+
+        return new Empty();
+    }
+
+    public override Empty RemoveFillOrderWhiteList(Address input)
+    {
+        Assert(input != null && !input.Value.IsNullOrEmpty(), "Invalid input.");
+        AssertSenderIsAdmin();
+        Assert(State.FillOrderWhiteList.Value != null && State.FillOrderWhiteList.Value.Value.Contains(input), "Address not exist");
+        State.FillOrderWhiteList.Value?.Value.Remove(input);
+        return new Empty();
+    }
+
+    public override WhiteList GetFillOrderWhiteList(Empty input)
+    {
+        return State.FillOrderWhiteList.Value;
+    }
+
     private void AssertContractInitialized()
     {
         Assert(State.Admin.Value != null, "Contract not initialized.");

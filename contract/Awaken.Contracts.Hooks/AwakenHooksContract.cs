@@ -120,7 +120,7 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
         {
             SymbolIn = symbolOut, // u
             SymbolOut = symbolIn, // elf
-            MinPrice = 0
+            MinOpenIntervalPrice = 0
         }).Price;
         if (limitOrderSellPrice == 0)
         {
@@ -152,8 +152,8 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
                 SymbolIn = symbolOut,
                 SymbolOut = symbolIn,
                 AmountIn = amountOut - amountOutPoolFilled - amountOutOrderFilled,
-                MinPrice = limitOrderSellPrice,
-                MaxPrice = nextPoolSellPrice
+                MinCloseIntervalPrice = limitOrderSellPrice,
+                MaxOpenIntervalPrice = nextPoolSellPrice
             });
             amountOutOrderFilled += fillResult.AmountInFilled;
             amountInOrderFilled += fillResult.AmountOutFilled;
@@ -166,7 +166,7 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
             {
                 SymbolIn = symbolOut,
                 SymbolOut = symbolIn,
-                MinPrice = fillResult.MaxPriceFilled
+                MinOpenIntervalPrice = fillResult.MaxPriceFilled
             }).Price;
             if (limitOrderSellPrice == 0)
             {
@@ -187,7 +187,7 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
                 SymbolIn = symbolOut,
                 SymbolOut = symbolIn,
                 AmountIn = amountOutOrderFilled,
-                MaxSellPrice = maxOrderSellPrice,
+                MaxOpenIntervalPrice = maxOrderSellPrice,
                 To = to
             });
         }
