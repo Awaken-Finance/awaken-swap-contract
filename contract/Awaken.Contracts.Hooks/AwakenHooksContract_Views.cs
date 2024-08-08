@@ -1,5 +1,8 @@
 using AElf.Types;
+using Awaken.Contracts.Token;
 using Google.Protobuf.WellKnownTypes;
+using AElf.Sdk.CSharp;
+using Awaken.Contracts.Swap;
 
 namespace Awaken.Contracts.Hooks;
 
@@ -32,5 +35,58 @@ public partial class AwakenHooksContract
     public override Address GetAdmin(Empty input)
     {
         return State.Admin.Value;
+    }
+    
+    public override GetMatchLimitOrderEnabledOutput GetMatchLimitOrderEnabled(Empty input)
+    {
+        return new GetMatchLimitOrderEnabledOutput
+        {
+            MatchLimitOrderEnabled = State.MatchLimitOrderEnabled.Value,
+            MultiSwapMatchLimitOrderEnabled = State.MultiSwapMatchLimitOrderEnabled.Value
+        };
+    }
+
+    public override Int64Value GetPrice(GetPriceInput input)
+    {
+        return new Int64Value
+        {
+            Value = State.PriceMapper[input.SymbolA][input.SymbolB]
+        };
+    }
+
+    public override GetAllReverseOutput GetAllReverse(GetAllReverseInput input)
+    {
+        var result = new GetAllReverseOutput();
+        var getTokenInfoInput = new GetTokenInfoInput
+        {
+            Symbol = GetTokenPairSymbol(input.SymbolA, input.SymbolB)
+        };
+        var getReservesInput = new GetReservesInput
+        {
+            SymbolPair = { input.SymbolA + "-" + input.SymbolB}
+        };
+        foreach (var swapContractInfo in State.SwapContractInfoList.Value.SwapContracts)
+        {
+            var tokenInfo = Context.Call<TokenInfo>(swapContractInfo.LpTokenContractAddress, "GetTokenInfo", getTokenInfoInput);
+            if (!string.IsNullOrWhiteSpace(tokenInfo.Symbol))
+            {
+                var reservesOutput = Context.Call<GetReservesOutput>(swapContractInfo.SwapContractAddress, "GetReserves", getReservesInput);
+                var reservePairResult = reservesOutput.Results[0];
+                result.Reverses.Add(new Reverse()
+                {
+                    FeeRate = swapContractInfo.FeeRate,
+                    ReverseA = reservePairResult.ReserveA,
+                    ReverseB = reservePairResult.ReserveB,
+                    SymbolA = reservePairResult.SymbolA,
+                    SymbolB = reservePairResult.SymbolB
+                });
+            }
+        }
+        return result;
+    }
+
+    public override Address GetOrderContract(Empty input)
+    {
+        return State.OrderContract.Value;
     }
 }

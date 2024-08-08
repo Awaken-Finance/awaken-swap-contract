@@ -56,7 +56,7 @@ public partial class AwakenOrderContract
 
     public override Int64Value CalculatePrice(CalculatePriceInput input)
     {
-        CalculatePrice(input.SymbolIn, input.SymbolOut, input.AmountIn, input.AmountOut, false, out var price);
+        CalculatePrice(input.SymbolIn, input.SymbolOut, input.AmountIn, input.AmountOut, false, out var price, out var realAmountOut);
         return new Int64Value
         {
             Value = price
@@ -67,6 +67,19 @@ public partial class AwakenOrderContract
     public override GetFillResultOutput GetFillResult(GetFillResultInput input)
     {
         var result = new GetFillResultOutput();
+        if (input.AmountIn == 0 && input.AmountOut == 0)
+        {
+            return result;
+        }
+        if (input.AmountIn == 0)
+        {
+            input.AmountIn = long.MaxValue;
+        }
+        if (input.AmountOut == 0)
+        {
+            input.AmountOut = long.MaxValue;
+        }
+
         var orderBookConfig = State.OrderBookConfig.Value;
         var headerPriceBookId = State.HeaderPriceBookIdMap[input.SymbolIn][input.SymbolOut];
         var headerPriceBook = State.PriceBookMap[headerPriceBookId];
@@ -76,7 +89,7 @@ public partial class AwakenOrderContract
         }
         
         var priceBook = FindPriceBook(headerPriceBook, input.MinCloseIntervalPrice);
-        while (result.AmountInFilled < input.AmountIn)
+        while (result.AmountInFilled < input.AmountIn && result.AmountOutFilled < input.AmountOut)
         {
             foreach (var sellPrice in priceBook.PriceList.Prices)
             {
@@ -91,7 +104,7 @@ public partial class AwakenOrderContract
 
                 var headerOrderBookId = State.OrderBookIdMap[input.SymbolIn][input.SymbolOut][sellPrice];
                 var headerOrderBook = State.OrderBookMap[headerOrderBookId];
-                TryFillOrderBookList(headerOrderBook, input.AmountIn - result.AmountInFilled, 
+                TryFillOrderBookList(headerOrderBook, input.AmountIn - result.AmountInFilled, input.AmountOut - result.AmountOutFilled,
                     orderBookConfig.MaxFillOrderCount - result.OrderFilledCount,  out var amountInFilled, 
                     out var amountOutFilled, out var orderFilledCount);
                 result.AmountInFilled += amountInFilled;

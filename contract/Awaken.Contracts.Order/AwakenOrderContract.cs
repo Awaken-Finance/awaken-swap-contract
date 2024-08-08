@@ -15,16 +15,8 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         Assert(input.AmountIn > 0 && input.AmountOut > 0, "Invalid input.");
         AssertContractInitialized();
         var orderBookConfig = State.OrderBookConfig.Value;
-        // check price， tradePair existed
         AssertAllowanceAndBalance(input.SymbolIn, input.AmountIn);
-        CalculatePrice(input.SymbolIn, input.SymbolOut, input.AmountIn, input.AmountOut, true, out var price);
-        BigIntValue amountInBigValue = new BigIntValue(input.AmountIn);
-        var realAmountOutStr = amountInBigValue.Mul(price).Div(orderBookConfig.PriceMultiple).Value;
-        if (!long.TryParse(realAmountOutStr, out var realAmountOut))
-        {
-            throw new AssertionException($"Failed to parse {realAmountOutStr}");
-        }
-        
+        CalculatePrice(input.SymbolIn, input.SymbolOut, input.AmountIn, input.AmountOut, true, out var price, out var realAmountOut);
         var headOrderBookId = State.OrderBookIdMap[input.SymbolIn][input.SymbolOut][price];
         if (headOrderBookId == 0)
         {
@@ -42,7 +34,8 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
             AmountIn = input.AmountIn,
             AmountOut = realAmountOut,
             Deadline = input.Deadline,
-            Maker = Context.Sender
+            Maker = Context.Sender,
+            CommitTime = Context.CurrentBlockTime
         };
         var orderBook = State.OrderBookMap[headOrderBookId] ?? new OrderBook
         {
@@ -214,7 +207,7 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         return orderBook;
     }
     
-    private void TryFillOrderBookList(OrderBook headerOrderBook, long maxAmountInFilled, int maxFillOrderCount, 
+    private void TryFillOrderBookList(OrderBook headerOrderBook, long maxAmountInFilled, long maxAmountOutFilled, int maxFillOrderCount, 
         out long amountInFilled, out long amountOutFilled, out int orderFilledCount)
     {
         amountInFilled = 0;
@@ -225,9 +218,9 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
             return;
         }
         var orderBook = headerOrderBook;
-        while (amountInFilled < maxAmountInFilled && orderFilledCount < maxFillOrderCount)
+        while (amountInFilled < maxAmountInFilled && amountOutFilled < maxAmountOutFilled && orderFilledCount < maxFillOrderCount)
         {
-            TryFillOrderBook(orderBook, maxAmountInFilled - amountInFilled, maxFillOrderCount - orderFilledCount,
+            TryFillOrderBook(orderBook, maxAmountInFilled - amountInFilled, maxAmountOutFilled - amountOutFilled, maxFillOrderCount - orderFilledCount,
                 out var amountInFilledThisBook, out var amountOutFilledThisBook, out var orderFilledCountThisBook);
             amountInFilled += amountInFilledThisBook;
             amountOutFilled += amountOutFilledThisBook;
@@ -249,7 +242,7 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         foreach (var userLimitOrder in orderBook.UserLimitOrders)
         {
             orderFilledCount++;
-            var checkoutResult = CheckAllowanceAndBalance(userLimitOrder.Maker, orderBook.SymbolIn, userLimitOrder.AmountIn);
+            var checkoutResult = CheckAllowanceAndBalance(userLimitOrder.Maker, orderBook.SymbolIn, userLimitOrder.AmountIn - userLimitOrder.AmountInFilled, out var reasonType);
             if (!checkoutResult || userLimitOrder.Deadline < Context.CurrentBlockTime)
             {
                 orderNeedRemoveCount++;
@@ -257,7 +250,8 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
                 Context.Fire(new LimitOrderRemoved
                 {
                     OrderId = userLimitOrder.OrderId,
-                    RemoveTime = Context.CurrentBlockTime
+                    RemoveTime = Context.CurrentBlockTime,
+                    ReasonType = reasonType
                 });
                 continue;
             }
@@ -303,8 +297,8 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         }
     }
     
-    private void TryFillOrderBook(OrderBook orderBook, long maxAmountInFilled, int maxFillOrderCount, out long amountInFilled, out long amountOutFilled,
-        out int orderFilledCount)
+    private void TryFillOrderBook(OrderBook orderBook, long maxAmountInFilled, long maxAmountOutFilled, int maxFillOrderCount, 
+        out long amountInFilled, out long amountOutFilled, out int orderFilledCount)
     {
         amountInFilled = 0;
         amountOutFilled = 0;
@@ -312,7 +306,8 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         foreach (var userLimitOrder in orderBook.UserLimitOrders)
         {
             orderFilledCount++;
-            var checkoutResult = CheckAllowanceAndBalance(userLimitOrder.Maker, orderBook.SymbolIn, userLimitOrder.AmountIn - userLimitOrder.AmountInFilled);
+            var checkoutResult = CheckAllowanceAndBalance(userLimitOrder.Maker, orderBook.SymbolIn, 
+                userLimitOrder.AmountIn - userLimitOrder.AmountInFilled, out var reasonType);
             if (!checkoutResult || userLimitOrder.Deadline < Context.CurrentBlockTime)
             {
                 continue;
@@ -323,9 +318,18 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
             {
                 throw new AssertionException($"Failed to parse {amountOutStr}");
             }
+            if (amountOut > maxAmountOutFilled - amountOutFilled)
+            {
+                amountOut = maxAmountOutFilled - amountOutFilled;
+                var amountInStr = new BigIntValue(userLimitOrder.AmountIn).Mul(amountOut).Div(userLimitOrder.AmountOut).Value;
+                if (!long.TryParse(amountInStr, out amountIn))
+                {
+                    throw new AssertionException($"Failed to parse {amountInStr}");
+                }
+            }
             amountInFilled += amountIn;
             amountOutFilled += amountOut;
-            if (amountInFilled >= maxAmountInFilled || orderFilledCount >= maxFillOrderCount)
+            if (amountInFilled >= maxAmountInFilled || amountOutFilled >= maxAmountOutFilled || orderFilledCount >= maxFillOrderCount)
             {
                 break;
             }

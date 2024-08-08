@@ -1,11 +1,5 @@
-using System;
-using System.Linq;
-using AElf;
 using AElf.Contracts.MultiToken;
 using AElf.Sdk.CSharp;
-using AElf.Types;
-using Awaken.Contracts.Order;
-using Awaken.Contracts.Swap;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using TransferFromInput = Awaken.Contracts.Token.TransferFromInput;
@@ -31,39 +25,6 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
         return new Empty();
     }
 
-    public override Empty SetAdmin(Address input)
-    {
-        Assert(!input.Value.IsNullOrEmpty(), "Invalid input.");
-        CheckAdminPermission();
-        State.Admin.Value = input;
-        return new Empty();
-    }
-
-    public override Empty AddSwapContractInfo(AddSwapContractInfoInput input)
-    {
-        CheckAdminPermission();
-        Assert(input.SwapContractList != null && input.SwapContractList.SwapContracts.Count > 0, "Invalid input.");
-        FillSwapContractInfoList(input.SwapContractList);
-        return new Empty();
-    }
-
-    public override Empty RemoveSwapContractInfo(RemoveSwapContractInfoInput input)
-    {
-        CheckAdminPermission();
-        Assert(input.FeeRates.Count > 0, "Invalid input.");
-        var swapContractInfoList = State.SwapContractInfoList.Value ??= new SwapContractInfoList();
-        foreach (var feeRate in input.FeeRates)
-        {
-            var swapContractInfo = swapContractInfoList.SwapContracts.FirstOrDefault(t => t.FeeRate == feeRate);
-            if (swapContractInfo != null)
-            {
-                swapContractInfoList.SwapContracts.Remove(swapContractInfo);
-            }
-        }
-        State.SwapContractInfoList.Value = swapContractInfoList;
-        return new Empty();
-    }
-
     public override Empty SwapExactTokensForTokens(SwapExactTokensForTokensInput input)
     {
         Assert(input.SwapTokens.Count > 0, "Invalid input.");
@@ -71,126 +32,48 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
         {
             var amounts = GetAmountsOut(swapInput.AmountIn, swapInput.Path, swapInput.FeeRates);
             Assert(amounts[amounts.Count - 1] >= swapInput.AmountOutMin, "Insufficient Output amount");
+            
+            if (State.MatchLimitOrderEnabled.Value &&
+                (swapInput.FeeRates.Count == 1 || State.MultiSwapMatchLimitOrderEnabled.Value))
+            {
+                MixSwapExactTokensForTokensAndLimitOrder(swapInput, amounts);
+                continue;
+            }
+            
             TransferFromSender(swapInput.Path[0], swapInput.AmountIn, "Hooks Swap");
-
+            var beginIndex = 0;
             for (var pathCount = 0; pathCount < swapInput.FeeRates.Count; pathCount++)
             {
-                var swapContractAddress = GetSwapContractInfo(swapInput.FeeRates[pathCount]).SwapContractAddress;
-                var amountIn = amounts[pathCount];
-                var amountOut = amounts[pathCount + 1];
-                if (State.MatchLimitOrderEnabled.Value && (swapInput.FeeRates.Count == 1 || State.MultiSwapMatchLimitOrderEnabled.Value))
+                if (pathCount < swapInput.FeeRates.Count - 1 && swapInput.FeeRates[pathCount] == swapInput.FeeRates[pathCount + 1])
                 {
-                    MatchLimitOrder(swapContractAddress, pathCount == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self, 
-                        swapInput.Path[pathCount], swapInput.Path[pathCount + 1], amounts[pathCount], amounts[pathCount + 1],
-                        out var amountOutPoolFilled, out var amountInPoolFilled);
-                    amountIn = amountInPoolFilled;
-                    amountOut = amountOutPoolFilled;
+                    continue;
                 }
+
+                var swapContractAddress = GetSwapContractInfo(swapInput.FeeRates[pathCount]).SwapContractAddress;
                 State.TokenContract.Approve.Send(new ApproveInput()
                 {
                     Spender = swapContractAddress,
-                    Symbol = swapInput.Path[pathCount],
-                    Amount = amountIn
+                    Symbol = swapInput.Path[beginIndex],
+                    Amount = amounts[beginIndex]
                 });
                 var swapExactTokensForTokensInput = new Swap.SwapExactTokensForTokensInput()
                 {
-                    AmountIn = amountIn,
-                    AmountOutMin = amountOut,
-                    Path = { swapInput.Path[pathCount], swapInput.Path[pathCount + 1] },
+                    AmountIn = amounts[beginIndex],
+                    AmountOutMin = amounts[pathCount + 1],
                     Deadline = swapInput.Deadline,
                     Channel = swapInput.Channel,
                     To = pathCount == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self
                 };
+                for (var index = beginIndex; index <= pathCount + 1; index++) {
+                    swapExactTokensForTokensInput.Path.Add(swapInput.Path[index]);
+                }
 
                 Context.SendInline(swapContractAddress, nameof(SwapExactTokensForTokens), swapExactTokensForTokensInput.ToByteString());
+                beginIndex = pathCount + 1;
             }
         }
         FireHooksTransactionCreatedLogEvent(nameof(SwapExactTokensForTokens), input.ToByteString());
         return new Empty();
-    }
-
-    private void MatchLimitOrder(Address swapContractAddress, Address to, string symbolIn, string symbolOut, long amountIn, long amountOut,
-        out long amountOutPoolFilled, out long amountInPoolFilled)
-    {
-        amountInPoolFilled = 0;
-        amountOutPoolFilled = 0;
-        var amountOutOrderFilled = 0L;
-        var amountInOrderFilled = 0L;
-        var limitOrderSellPrice = State.OrderContract.GetBestSellPrice.Call(new GetBestSellPriceInput
-        {
-            SymbolIn = symbolOut, // u
-            SymbolOut = symbolIn, // elf
-            MinOpenIntervalPrice = 0
-        }).Price;
-        if (limitOrderSellPrice == 0)
-        {
-            amountInPoolFilled = amountIn;
-            amountOutPoolFilled = amountOut;
-            return;
-        }
-        var minPoolAmountOut = amountOut / 10;
-        var maxOrderSellPrice = 0L;
-        while (amountOutPoolFilled + amountOutOrderFilled < amountOut)
-        {
-            minPoolAmountOut = Math.Min(minPoolAmountOut, amountOut - amountOutOrderFilled - amountOutPoolFilled);
-            amountOutPoolFilled += minPoolAmountOut;
-            var nextPoolAmountIn = Context.Call<Int64Value>(swapContractAddress, "GetAmountIn", new GetAmountInInput()
-            {
-                SymbolIn = symbolIn,
-                SymbolOut = symbolOut,
-                AmountOut = amountOutPoolFilled
-            }).Value;
-            // cross order price
-            var nextPoolSellPrice = (nextPoolAmountIn - amountInPoolFilled) / minPoolAmountOut;
-            if (nextPoolSellPrice < limitOrderSellPrice)
-            {
-                continue;
-            }
-            amountInPoolFilled = nextPoolAmountIn;
-            var fillResult = State.OrderContract.GetFillResult.Call(new GetFillResultInput
-            {
-                SymbolIn = symbolOut,
-                SymbolOut = symbolIn,
-                AmountIn = amountOut - amountOutPoolFilled - amountOutOrderFilled,
-                MinCloseIntervalPrice = limitOrderSellPrice,
-                MaxOpenIntervalPrice = nextPoolSellPrice
-            });
-            amountOutOrderFilled += fillResult.AmountInFilled;
-            amountInOrderFilled += fillResult.AmountOutFilled;
-            maxOrderSellPrice = fillResult.MaxPriceFilled;
-            if (amountOutOrderFilled + amountOutPoolFilled >= amountOut)
-            {
-                break;
-            }
-            limitOrderSellPrice = State.OrderContract.GetBestSellPrice.Call(new GetBestSellPriceInput
-            {
-                SymbolIn = symbolOut,
-                SymbolOut = symbolIn,
-                MinOpenIntervalPrice = fillResult.MaxPriceFilled
-            }).Price;
-            if (limitOrderSellPrice == 0)
-            {
-                break;
-            }
-        }
-
-        if (amountOutOrderFilled > 0)
-        {
-            State.TokenContract.Approve.Send(new ApproveInput()
-            {
-                Spender = State.OrderContract.Value,
-                Symbol = symbolIn,
-                Amount = amountInOrderFilled
-            });
-            State.OrderContract.FillLimitOrder.Send(new FillLimitOrderInput
-            {
-                SymbolIn = symbolOut,
-                SymbolOut = symbolIn,
-                AmountIn = amountOutOrderFilled,
-                MaxOpenIntervalPrice = maxOrderSellPrice,
-                To = to
-            });
-        }
     }
 
     public override Empty SwapTokensForExactTokens(SwapTokensForExactTokensInput input)
@@ -200,43 +83,48 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
         {
             var amounts = GetAmountsIn(swapInput.AmountOut, swapInput.Path, swapInput.FeeRates);
             Assert(amounts[0] <= swapInput.AmountInMax, "Excessive Input amount");
+
+            if (State.MatchLimitOrderEnabled.Value &&
+                (swapInput.FeeRates.Count == 1 || State.MultiSwapMatchLimitOrderEnabled.Value))
+            {
+                MixSwapTokensForExactTokensAndLimitOrder(swapInput, amounts);
+                continue;
+            }
+
             TransferFromSender(swapInput.Path[0], amounts[0], "Hooks Swap");
+            var beginIndex = 0;
             for (var pathCount = 0; pathCount < swapInput.FeeRates.Count; pathCount++)
             {
-                var swapContractAddress = GetSwapContractInfo(swapInput.FeeRates[pathCount]).SwapContractAddress;
-                var amountIn = amounts[pathCount];
-                var amountOut = amounts[pathCount + 1];
-                if (State.MatchLimitOrderEnabled.Value && (swapInput.FeeRates.Count == 1 || State.MultiSwapMatchLimitOrderEnabled.Value))
+                if (pathCount < swapInput.FeeRates.Count - 1 && swapInput.FeeRates[pathCount] == swapInput.FeeRates[pathCount + 1])
                 {
-                    MatchLimitOrder(swapContractAddress, pathCount == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self, 
-                        swapInput.Path[pathCount], swapInput.Path[pathCount + 1], amounts[pathCount], amounts[pathCount + 1],
-                        out var amountOutPoolFilled, out var amountInPoolFilled);
-                    amountIn = amountInPoolFilled;
-                    amountOut = amountOutPoolFilled;
+                    continue;
                 }
-                
+                var swapContractAddress = GetSwapContractInfo(swapInput.FeeRates[pathCount]).SwapContractAddress;
                 State.TokenContract.Approve.Send(new ApproveInput()
                 {
                     Spender = swapContractAddress,
-                    Symbol = swapInput.Path[pathCount],
-                    Amount = amountIn
+                    Symbol = swapInput.Path[beginIndex],
+                    Amount = amounts[beginIndex]
                 });
                 var swapTokensForExactTokensInput = new Swap.SwapTokensForExactTokensInput()
                 {
-                    AmountInMax = amountIn,
-                    AmountOut = amountOut,
-                    Path = { swapInput.Path[pathCount], swapInput.Path[pathCount + 1] },
+                    AmountInMax = amounts[beginIndex],
+                    AmountOut = amounts[pathCount + 1],
                     Deadline = swapInput.Deadline,
                     Channel = swapInput.Channel,
                     To = pathCount == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self
                 };
+                for (var index = beginIndex; index <= pathCount + 1; index++) {
+                    swapTokensForExactTokensInput.Path.Add(swapInput.Path[index]);
+                }
                 Context.SendInline(swapContractAddress, nameof(SwapTokensForExactTokens), swapTokensForExactTokensInput.ToByteString());
+                beginIndex = pathCount + 1;
             }
         }
         FireHooksTransactionCreatedLogEvent(nameof(SwapTokensForExactTokens), input.ToByteString());
         return new Empty();
     }
-    
+
     public override Empty CreatePair(CreatePairInput input)
     {
         var swapContract = GetSwapContractInfo(input.FeeRate);

@@ -54,8 +54,9 @@ public partial class AwakenOrderContract
         Assert(balance.Balance >= amount, "Balance not enough");
     }
     
-    private bool CheckAllowanceAndBalance(Address owner, string symbol, long amount)
+    private bool CheckAllowanceAndBalance(Address owner, string symbol, long amount, out ReasonType reasonType)
     {
+        reasonType = ReasonType.Expired;
         var allowance = State.TokenContract.GetAllowance.Call(new GetAllowanceInput
         {
             Spender = Context.Self,
@@ -64,6 +65,7 @@ public partial class AwakenOrderContract
         });
         if (allowance.Allowance < amount)
         {
+            reasonType = ReasonType.AllowanceNotEnough;
             return false;
         }
         var balance = State.TokenContract.GetBalance.Call(new GetBalanceInput()
@@ -71,7 +73,12 @@ public partial class AwakenOrderContract
             Owner = owner,
             Symbol = symbol
         });
-        return balance.Balance >= amount;
+        if (balance.Balance < amount)
+        {
+            reasonType = ReasonType.BalanceNotEnough;
+            return false;
+        }
+        return true;
     }
     
     private void UpdatePriceBook(string symbolIn, string symbolOut, long price)
@@ -176,12 +183,13 @@ public partial class AwakenOrderContract
         }).Decimals;
     }
     
-    private void CalculatePrice(string symbolIn, string symbolOut, long amountIn, long amountOut, bool erasePlaceDecimal, out long price)
+    private void CalculatePrice(string symbolIn, string symbolOut, long amountIn, long amountOut, bool erasePlaceDecimal, out long price, out long realAmountOut)
     {
         var symbolInDecimal = GetTokenDecimal(symbolIn);
         var symbolOutDecimal = GetTokenDecimal(symbolOut);
         var amountOutBigIntValue = new BigIntValue(amountOut);
-        var weightPrice = amountOutBigIntValue.Mul(IntPow(10, 8 + symbolInDecimal - symbolOutDecimal))
+        var multiple = IntPow(10, 8 + symbolInDecimal - symbolOutDecimal);
+        var weightPrice = amountOutBigIntValue.Mul(multiple)
             .Div(amountIn);
         if (!long.TryParse(weightPrice.Value, out price))
         {
@@ -191,6 +199,13 @@ public partial class AwakenOrderContract
         {
             var erasePriceMultiple = State.OrderBookConfig.Value.ErasePriceMultiple;
             price = price / erasePriceMultiple * erasePriceMultiple;
+        }
+
+        var realAmountOutStr =
+            new BigIntValue(amountIn).Mul(price).Div(multiple);
+        if (!long.TryParse(realAmountOutStr.Value, out realAmountOut))
+        {
+            throw new AssertionException($"Failed to parse {realAmountOutStr.Value}");
         }
     }
 }
