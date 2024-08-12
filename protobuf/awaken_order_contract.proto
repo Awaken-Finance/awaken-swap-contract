@@ -99,6 +99,8 @@ message OrderBookConfig {
   int64 price_multiple = 4;
   int64 erase_price_multiple = 5;
   int64 min_order_value_in_usdt = 6;
+  int64 max_order_books_each_price = 7;
+  int64 max_price_books_each_trade_pair = 8;
 }
 
 message WhiteList {
@@ -120,9 +122,10 @@ message CancelLimitOrderInput {
 message FillLimitOrderInput {
   int64 amount_in = 1;
   string symbol_in = 2;
-  int64 max_open_interval_price = 3; 
-  string symbol_out = 4;
-  aelf.Address to = 5;
+  int64 max_close_interval_price = 3;
+  int64 amount_out = 4;
+  string symbol_out = 5;
+  aelf.Address to = 6;
 }
 
 message GetBestSellPriceInput {
@@ -142,12 +145,21 @@ message GetFillResultInput {
   string symbol_out = 4;
   int64 min_close_interval_price = 5;
   int64 max_open_interval_price = 6;
+  int32 max_fill_order_count = 7;
 }
 
 message GetFillResultOutput {
   int64 amount_in_filled = 1;
   int64 max_price_filled = 2;
   int64 amount_out_filled = 3;
+  int32 order_filled_count = 4;
+  repeated FillDetail fill_details = 5;
+}
+
+message FillDetail {
+  int64 price = 1;
+  int64 amount_in = 2;
+  int64 amount_out = 3;
   int32 order_filled_count = 4;
 }
 
@@ -207,6 +219,7 @@ message LimitOrderFilled {
   int64 amount_in_filled = 3;
   int64 amount_out_filled = 4;
   aelf.Address taker = 5;
+  int64 total_fee = 6;
 }
 
 message LimitOrderCancelled {

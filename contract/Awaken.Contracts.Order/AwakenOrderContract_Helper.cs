@@ -141,9 +141,11 @@ public partial class AwakenOrderContract
     private void ExpandPriceBook(PriceBook priceBook)
     {
         var spiltIndex = priceBook.PriceList.Prices.Count / 2;
+        var newPriceBookId = State.LastPriceBookId.Value.Add(1);
+        State.LastPriceBookId.Value = newPriceBookId;
         var newPriceBook = new PriceBook
         {
-            PriceBookId = State.LastPriceBookId.Value.Add(1),
+            PriceBookId = newPriceBookId,
             NextPagePriceBookId = priceBook.NextPagePriceBookId,
             PriceList = new PriceList
             {
@@ -162,7 +164,7 @@ public partial class AwakenOrderContract
     {
         var priceBook = headerPriceBook;
         var nextPriceBook = State.PriceBookMap[priceBook.NextPagePriceBookId];
-        for (var i = 0; i < 50; i++)
+        for (var i = 0; i < State.OrderBookConfig.Value.MaxPriceBooksEachTradePair - 1; i++)
         {
             if (nextPriceBook == null || price < nextPriceBook.PriceList.Prices[0])
             {

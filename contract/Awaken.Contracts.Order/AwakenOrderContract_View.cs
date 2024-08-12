@@ -87,7 +87,9 @@ public partial class AwakenOrderContract
         {
             return result;
         }
-        
+
+        var maxOrderFillCount =
+            input.MaxFillOrderCount == 0 ? orderBookConfig.MaxFillOrderCount : input.MaxFillOrderCount;
         var priceBook = FindPriceBook(headerPriceBook, input.MinCloseIntervalPrice);
         while (result.AmountInFilled < input.AmountIn && result.AmountOutFilled < input.AmountOut)
         {
@@ -105,14 +107,21 @@ public partial class AwakenOrderContract
                 var headerOrderBookId = State.OrderBookIdMap[input.SymbolIn][input.SymbolOut][sellPrice];
                 var headerOrderBook = State.OrderBookMap[headerOrderBookId];
                 TryFillOrderBookList(headerOrderBook, input.AmountIn - result.AmountInFilled, input.AmountOut - result.AmountOutFilled,
-                    orderBookConfig.MaxFillOrderCount - result.OrderFilledCount,  out var amountInFilled, 
+                    maxOrderFillCount - result.OrderFilledCount,  out var amountInFilled, 
                     out var amountOutFilled, out var orderFilledCount);
                 result.AmountInFilled += amountInFilled;
                 result.AmountOutFilled += amountOutFilled;
                 result.OrderFilledCount += orderFilledCount;
                 result.MaxPriceFilled = sellPrice;
+                result.FillDetails.Add(new FillDetail
+                {
+                    Price = sellPrice,
+                    AmountIn = amountInFilled,
+                    AmountOut = amountOutFilled,
+                    OrderFilledCount = orderFilledCount
+                });
                 
-                if (result.AmountInFilled >= input.AmountIn || result.OrderFilledCount >= orderBookConfig.MaxFillOrderCount)
+                if (result.AmountInFilled >= input.AmountIn || result.AmountOutFilled >= input.AmountOut || result.OrderFilledCount >= maxOrderFillCount)
                 {
                     return result;
                 }

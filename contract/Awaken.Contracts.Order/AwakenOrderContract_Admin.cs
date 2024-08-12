@@ -36,7 +36,9 @@ public partial class AwakenOrderContract
             MaxFillOrderCount = MaxFillOrderCount,
             MinOrderValueInUsdt = MinOrderValueInUsdt,
             PriceMultiple = PriceMultiple,
-            ErasePriceMultiple = ErasePriceMultiple
+            ErasePriceMultiple = ErasePriceMultiple,
+            MaxOrderBooksEachPrice =MaxOrderBooksEachPrice,
+            MaxPriceBooksEachTradePair = MaxPriceBooksEachTradePair
         };
     }
     
@@ -49,9 +51,17 @@ public partial class AwakenOrderContract
         {
             orderBookConfig.MaxOrdersEachOrderBook = input.OrderBookConfig.MaxOrdersEachOrderBook;
         }
+        if (input.OrderBookConfig.MaxOrderBooksEachPrice > 0)
+        {
+            orderBookConfig.MaxOrderBooksEachPrice = input.OrderBookConfig.MaxOrderBooksEachPrice;
+        }
         if (input.OrderBookConfig.MaxPricesEachPriceBook > 0)
         {
             orderBookConfig.MaxPricesEachPriceBook = input.OrderBookConfig.MaxPricesEachPriceBook;
+        }
+        if (input.OrderBookConfig.MaxPriceBooksEachTradePair > 0)
+        {
+            orderBookConfig.MaxPriceBooksEachTradePair = input.OrderBookConfig.MaxPriceBooksEachTradePair;
         }
         if (input.OrderBookConfig.MaxFillOrderCount > 0)
         {

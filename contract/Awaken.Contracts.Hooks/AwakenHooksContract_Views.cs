@@ -37,20 +37,13 @@ public partial class AwakenHooksContract
         return State.Admin.Value;
     }
     
-    public override GetMatchLimitOrderEnabledOutput GetMatchLimitOrderEnabled(Empty input)
+    public override GetLimitOrderConfigOutput GetLimitOrderConfig(Empty input)
     {
-        return new GetMatchLimitOrderEnabledOutput
+        return new GetLimitOrderConfigOutput()
         {
             MatchLimitOrderEnabled = State.MatchLimitOrderEnabled.Value,
-            MultiSwapMatchLimitOrderEnabled = State.MultiSwapMatchLimitOrderEnabled.Value
-        };
-    }
-
-    public override Int64Value GetPrice(GetPriceInput input)
-    {
-        return new Int64Value
-        {
-            Value = State.PriceMapper[input.SymbolA][input.SymbolB]
+            MultiSwapMatchLimitOrderEnabled = State.MultiSwapMatchLimitOrderEnabled.Value,
+            MaxFillLimitOrderCount = State.MaxFillLimitOrderCount.Value
         };
     }
 

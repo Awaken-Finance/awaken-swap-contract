@@ -140,6 +140,75 @@ public partial class AwakenHooksContractTests
     }
 
     [Fact]
+    public async Task MaxLimitOrdersTest()
+    {
+        await InitializeOrderContract();
+        await UserTomTokenContractStub.Approve.SendAsync(
+            new ApproveInput
+            {
+                Symbol = "ELF",
+                Amount = 50000,
+                Spender = OrderContractAddress
+            });
+        await AdminOrderStud.SetOrderBookConfig.SendAsync(new SetOrderBookConfigInput
+        {
+            OrderBookConfig = new OrderBookConfig
+            {
+                MaxOrdersEachOrderBook = 1,
+                MaxPricesEachPriceBook = 1,
+                MaxOrderBooksEachPrice = 5,
+                MaxPriceBooksEachTradePair = 5,
+            }
+        });
+        for (var i = 0; i <= 4; i++) {
+            await TomOrderStud.CommitLimitOrder.SendAsync(new CommitLimitOrderInput()
+            {
+                SymbolIn = "ELF",
+                SymbolOut = "TEST",
+                AmountIn = 1,
+                AmountOut = 1,
+                Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 1, 0)))
+            });
+        }
+        var result = await TomOrderStud.CommitLimitOrder.SendWithExceptionAsync(new CommitLimitOrderInput()
+        {
+            SymbolIn = "ELF",
+            SymbolOut = "TEST",
+            AmountIn = 1,
+            AmountOut = 1,
+            Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 1, 0)))
+        });
+        result.TransactionResult.Error.ShouldContain("Too many orders at this price.");
+        
+        await UserTomTokenContractStub.Approve.SendAsync(
+            new ApproveInput
+            {
+                Symbol = "TEST",
+                Amount = 50000,
+                Spender = OrderContractAddress
+            });
+        for (var i = 0; i <= 5; i++) {
+            await TomOrderStud.CommitLimitOrder.SendAsync(new CommitLimitOrderInput()
+            {
+                SymbolIn = "TEST",
+                SymbolOut = "ELF",
+                AmountIn = 1,
+                AmountOut = i + 1,
+                Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 1, 0)))
+            });
+        }
+        result = await TomOrderStud.CommitLimitOrder.SendWithExceptionAsync(new CommitLimitOrderInput()
+        {
+            SymbolIn = "TEST",
+            SymbolOut = "ELF",
+            AmountIn = 1,
+            AmountOut = 7,
+            Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 1, 0)))
+        });
+        result.TransactionResult.Error.ShouldContain("Too many price in this tradePair.");
+    }
+
+    [Fact]
     public async Task CancelLimitOrderTest()
     {
         await InitializeOrderContract();
@@ -311,7 +380,7 @@ public partial class AwakenHooksContractTests
         {
             SymbolIn = "ELF",
             SymbolOut = "TEST",
-            MaxOpenIntervalPrice = 300000000,
+            MaxCloseIntervalPrice = 300000000,
             AmountIn = 50,
             To = AdminAddress
         });
@@ -328,7 +397,7 @@ public partial class AwakenHooksContractTests
         {
             SymbolIn = "ELF",
             SymbolOut = "TEST",
-            MaxOpenIntervalPrice = 300000000,
+            MaxCloseIntervalPrice = 300000000,
             AmountIn = 50,
             To = AdminAddress
         });
@@ -349,7 +418,7 @@ public partial class AwakenHooksContractTests
         {
             SymbolIn = "ELF",
             SymbolOut = "TEST",
-            MaxOpenIntervalPrice = 300000000,
+            MaxCloseIntervalPrice = 300000000,
             AmountIn = 200,
             To = AdminAddress
         }); 
@@ -379,7 +448,7 @@ public partial class AwakenHooksContractTests
         {
             SymbolIn = "ELF",
             SymbolOut = "TEST",
-            MaxOpenIntervalPrice = 300000000,
+            MaxCloseIntervalPrice = 300000000,
             AmountIn = 200,
             To = AdminAddress
         }); 
@@ -424,7 +493,7 @@ public partial class AwakenHooksContractTests
         {
             SymbolIn = "ELF",
             SymbolOut = "TEST",
-            MaxOpenIntervalPrice = 400000000,
+            MaxCloseIntervalPrice = 400000000,
             AmountIn = 150,
             To = AdminAddress
         });
@@ -440,7 +509,7 @@ public partial class AwakenHooksContractTests
         {
             SymbolIn = "ELF",
             SymbolOut = "TEST",
-            MaxOpenIntervalPrice = 400000000,
+            MaxCloseIntervalPrice = 400000000,
             AmountIn = 100,
             To = AdminAddress
         });
@@ -455,7 +524,7 @@ public partial class AwakenHooksContractTests
         {
             SymbolIn = "ELF",
             SymbolOut = "TEST",
-            MaxOpenIntervalPrice = 400000000,
+            MaxCloseIntervalPrice = 400000000,
             AmountIn = 100,
             To = AdminAddress
         });
@@ -466,7 +535,7 @@ public partial class AwakenHooksContractTests
         {
             SymbolIn = "ELF",
             SymbolOut = "TEST",
-            MaxOpenIntervalPrice = 400000000,
+            MaxCloseIntervalPrice = 400000000,
             AmountIn = 100,
             To = AdminAddress
         });
@@ -474,13 +543,75 @@ public partial class AwakenHooksContractTests
     }
 
     [Fact]
+    public async Task MaxFillOrderCountsTest()
+    {
+        await CreateAndAddLiquidity();
+        await AdminHooksStud.SetLimitOrderConfig.SendAsync(new SetLimitOrderConfigInput()
+        {
+            MatchLimitOrderEnabled = true,
+            MultiSwapMatchLimitOrderEnabled = true,
+            MaxFillLimitOrderCount = 10
+        });
+        await AdminHooksStud.SetOrderContract.SendAsync(OrderContractAddress);
+        await AdminOrderStud.Initialize.SendAsync(new Order.InitializeInput
+        {
+            HooksContractAddress = AwakenHooksContractAddress
+        });
+        await AdminOrderStud.SetOrderBookConfig.SendAsync(new SetOrderBookConfigInput
+        {
+            OrderBookConfig = new OrderBookConfig
+            {
+                MaxOrdersEachOrderBook = 50,
+                MaxPricesEachPriceBook = 50,
+                MaxFillOrderCount = 10
+            }
+        });
+        await UserTomTokenContractStub.Approve.SendAsync(
+            new ApproveInput
+            {
+                Symbol = "ELF",
+                Amount = 10000000,
+                Spender = OrderContractAddress
+            });
+
+        // order + pool
+        for (int i = 0; i < 20; i++)
+        {
+            await UserTomCommitLimitOrder("ELF", "TEST", 1, 1);
+        }
+
+        var result = await TomHooksStud.SwapExactTokensForTokens.SendAsync(
+            new SwapExactTokensForTokensInput
+            {
+                SwapTokens =
+                {
+                    new SwapExactTokensForTokens
+                    {
+                        AmountIn = 2000,
+                        AmountOutMin = 900,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF" },
+                        FeeRates = { _feeRate }
+                    },
+                }
+            });
+        var limitOrderFilled =  result.TransactionResult.Logs.Where(t => t.Name == nameof(LimitOrderFilled)).ToList();
+        limitOrderFilled.Count.ShouldBe(10);
+        var swap = Swap.Swap.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(Swap)).NonIndexed);
+        swap.AmountIn.ShouldBe(1990);
+    }
+
+    [Fact]
     public async Task MixSwapExactTokensForTokensAndLimitOrderTest()
     {
         await CreateAndAddLiquidity();
-        await AdminHooksStud.SetMatchLimitOrderEnabled.SendAsync(new SetMatchLimitOrderEnabledInput
+        await AdminHooksStud.SetLimitOrderConfig.SendAsync(new SetLimitOrderConfigInput()
         {
             MatchLimitOrderEnabled = true,
-            MultiSwapMatchLimitOrderEnabled = true
+            MultiSwapMatchLimitOrderEnabled = true,
+            MaxFillLimitOrderCount = 50
         });
         await AdminHooksStud.SetOrderContract.SendAsync(OrderContractAddress);
         await AdminOrderStud.Initialize.SendAsync(new Order.InitializeInput
@@ -617,6 +748,418 @@ public partial class AwakenHooksContractTests
         limitOrderFilled.AmountOutFilled.ShouldBe(150);
         swap = Swap.Swap.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(Swap)).NonIndexed);
         swap.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task MixSwapExactTokensForTokensAndLimitOrderTest_TwoPair()
+    {
+        await CreateAndAddLiquidity();
+        await AdminHooksStud.SetLimitOrderConfig.SendAsync(new SetLimitOrderConfigInput()
+        {
+            MatchLimitOrderEnabled = true,
+            MultiSwapMatchLimitOrderEnabled = true,
+            MaxFillLimitOrderCount = 50
+        });
+        await AdminHooksStud.SetOrderContract.SendAsync(OrderContractAddress);
+        await AdminOrderStud.Initialize.SendAsync(new Order.InitializeInput
+        {
+            HooksContractAddress = AwakenHooksContractAddress
+        });
+        await UserTomTokenContractStub.Approve.SendAsync(
+            new ApproveInput
+            {
+                Symbol = "ELF",
+                Amount = 10000000,
+                Spender = OrderContractAddress
+            });
+        // (pool + order) + allPool
+        var limitOrderId3 = await UserTomCommitLimitOrder("ELF", "TEST", 100000, 150000);
+        var result = await TomHooksStud.SwapExactTokensForTokens.SendAsync(
+            new SwapExactTokensForTokensInput
+            {
+                SwapTokens =
+                {
+                    new SwapExactTokensForTokens
+                    {
+                        AmountIn = 200000,
+                        AmountOutMin = 40000,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF","DAI"},
+                        FeeRates = { _feeRate,_feeRate }
+                    },
+                }
+            });
+        var limitOrderFilled = LimitOrderFilled.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(LimitOrderFilled)).NonIndexed);
+        limitOrderFilled.OrderId.ShouldBe(limitOrderId3);
+        limitOrderFilled.AmountInFilled.ShouldBe(100000);
+        limitOrderFilled.AmountOutFilled.ShouldBe(150000);
+        var swap = Swap.Swap.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(Swap)).NonIndexed);
+        swap.AmountIn.ShouldBe(50000);
+        
+        //  allPool + (pool + order)
+        await UserTomTokenContractStub.Approve.SendAsync(
+            new ApproveInput
+            {
+                Symbol = "TEST",
+                Amount = 10000000,
+                Spender = OrderContractAddress
+            });
+        var limitOrderId4 = await UserTomCommitLimitOrder("TEST", "ELF", 250000, 100000);
+        result = await TomHooksStud.SwapExactTokensForTokens.SendAsync(
+            new SwapExactTokensForTokensInput
+            {
+                SwapTokens =
+                {
+                    new SwapExactTokensForTokens
+                    {
+                        AmountIn = 100000,
+                        AmountOutMin = 360000,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "DAI","ELF","TEST"},
+                        FeeRates = { _feeRate,_feeRate }
+                    },
+                }
+            });
+        limitOrderFilled = LimitOrderFilled.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(LimitOrderFilled)).NonIndexed);
+        limitOrderFilled.OrderId.ShouldBe(limitOrderId4);
+        limitOrderFilled.AmountInFilled.ShouldBe(250000);
+        limitOrderFilled.AmountOutFilled.ShouldBe(100000);
+        var swapEvent = result.TransactionResult.Logs.First(t => t.Name == nameof(Swap));
+        swap = Swap.Swap.Parser.ParseFrom(swapEvent.NonIndexed);
+        swap.SymbolIn.ShouldBe("DAI");
+        swap.SymbolOut.ShouldBe("ELF");
+        swap.AmountIn.ShouldBe(100000);
+        var elfAmountOut = swap.AmountOut;
+        result.TransactionResult.Logs.Remove(swapEvent);
+        swapEvent = result.TransactionResult.Logs.First(t => t.Name == nameof(Swap));
+        swap = Swap.Swap.Parser.ParseFrom(swapEvent.NonIndexed);
+        swap.SymbolIn.ShouldBe("ELF");
+        swap.SymbolOut.ShouldBe("TEST");
+        elfAmountOut.ShouldBe(100000 + swap.AmountIn);
+    }
+
+    [Fact]
+    public async Task RepeatedSwapExactTokensForTokensAndLimitOrderTest()
+    {
+        await CreateAndAddLiquidity();
+        await AdminHooksStud.SetLimitOrderConfig.SendAsync(new SetLimitOrderConfigInput()
+        {
+            MatchLimitOrderEnabled = true,
+            MultiSwapMatchLimitOrderEnabled = true,
+            MaxFillLimitOrderCount = 50
+        });
+        await AdminHooksStud.SetOrderContract.SendAsync(OrderContractAddress);
+        await AdminOrderStud.Initialize.SendAsync(new Order.InitializeInput
+        {
+            HooksContractAddress = AwakenHooksContractAddress
+        });
+        await UserTomTokenContractStub.Approve.SendAsync(
+            new ApproveInput
+            {
+                Symbol = "ELF",
+                Amount = 10000000,
+                Spender = OrderContractAddress
+            });
+
+        var limitOrderId1 = await UserTomCommitLimitOrder("ELF", "TEST", 200, 300);
+        var limitOrderId2 = await UserTomCommitLimitOrder("ELF", "TEST", 200, 320);
+        
+        await UserTomTokenContractStub.Approve.SendAsync(
+            new ApproveInput
+            {
+                Symbol = "TEST",
+                Amount = 10000000,
+                Spender = AwakenHooksContractAddress
+            });
+        var result = await TomHooksStud.SwapExactTokensForTokens.SendAsync(
+            new SwapExactTokensForTokensInput
+            {
+                SwapTokens =
+                {
+                    new SwapExactTokensForTokens
+                    {
+                        AmountIn = 150,
+                        AmountOutMin = 70,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF" },
+                        FeeRates = { _feeRate }
+                    },
+                    new SwapExactTokensForTokens
+                    {
+                        AmountIn = 170,
+                        AmountOutMin = 70,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF" },
+                        FeeRates = { _feeRate }
+                    }
+                }
+            });
+        var limitOrderFilled = result.TransactionResult.Logs.Where(t => t.Name == nameof(LimitOrderFilled)).ToList();
+        var orderFilled1 = LimitOrderFilled.Parser.ParseFrom(limitOrderFilled[0].NonIndexed);
+        var orderFilled2 = LimitOrderFilled.Parser.ParseFrom(limitOrderFilled[1].NonIndexed);
+        var orderFilled3 = LimitOrderFilled.Parser.ParseFrom(limitOrderFilled[2].NonIndexed);
+        orderFilled1.AmountOutFilled.ShouldBe(150);
+        orderFilled1.AmountInFilled.ShouldBe(100);
+        orderFilled1.OrderId.ShouldBe(limitOrderId1);
+        orderFilled2.AmountOutFilled.ShouldBe(150);
+        orderFilled2.AmountInFilled.ShouldBe(100);
+        orderFilled2.OrderId.ShouldBe(limitOrderId1);
+        orderFilled3.AmountOutFilled.ShouldBe(20);
+        orderFilled3.AmountInFilled.ShouldBe(12);
+        orderFilled3.OrderId.ShouldBe(limitOrderId2);
+    }
+
+    [Fact]
+    public async Task MixSwapTokensForExactTokensAndLimitOrderTest()
+    {
+        await CreateAndAddLiquidity();
+        await AdminHooksStud.SetLimitOrderConfig.SendAsync(new SetLimitOrderConfigInput()
+        {
+            MatchLimitOrderEnabled = true,
+            MultiSwapMatchLimitOrderEnabled = true,
+            MaxFillLimitOrderCount = 50
+        });
+        await AdminHooksStud.SetOrderContract.SendAsync(OrderContractAddress);
+        await AdminOrderStud.Initialize.SendAsync(new Order.InitializeInput
+        {
+            HooksContractAddress = AwakenHooksContractAddress
+        });
+        await UserTomTokenContractStub.Approve.SendAsync(
+            new ApproveInput
+            {
+                Symbol = "ELF",
+                Amount = 10000000,
+                Spender = OrderContractAddress
+            });
+        // pool only
+        var limitOrderId1 = await UserTomCommitLimitOrder("ELF", "TEST", 100, 300);
+        var result = await TomHooksStud.SwapTokensForExactTokens.SendAsync(
+            new SwapTokensForExactTokensInput()
+            {
+                SwapTokens =
+                {
+                    new SwapTokensForExactTokens()
+                    {
+                        AmountInMax = 250,
+                        AmountOut = 100,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF" },
+                        FeeRates = { _feeRate }
+                    },
+                }
+            });
+        var logEvent = result.TransactionResult.Logs.FirstOrDefault(t => t.Name == nameof(LimitOrderFilled));
+        logEvent.ShouldBeNull();
+        
+        // order only
+        var limitOrderId2 = await UserTomCommitLimitOrder("ELF", "TEST", 100, 150);
+        result = await TomHooksStud.SwapTokensForExactTokens.SendAsync(
+            new SwapTokensForExactTokensInput()
+            {
+                SwapTokens =
+                {
+                    new SwapTokensForExactTokens()
+                    {
+                        AmountInMax = 250,
+                        AmountOut = 100,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF" },
+                        FeeRates = { _feeRate }
+                    },
+                }
+            });
+        var limitOrderFilled = LimitOrderFilled.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(LimitOrderFilled)).NonIndexed);
+        limitOrderFilled.OrderId.ShouldBe(limitOrderId2);
+        limitOrderFilled.AmountInFilled.ShouldBe(100);
+        limitOrderFilled.AmountOutFilled.ShouldBe(150);
+        
+        // order + pool
+        var limitOrderId3 = await UserTomCommitLimitOrder("ELF", "TEST", 100, 150);
+        result = await TomHooksStud.SwapTokensForExactTokens.SendAsync(
+            new SwapTokensForExactTokensInput()
+            {
+                SwapTokens =
+                {
+                    new SwapTokensForExactTokens()
+                    {
+                        AmountInMax = 400,
+                        AmountOut = 150,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF" },
+                        FeeRates = { _feeRate }
+                    },
+                }
+            });
+        limitOrderFilled = LimitOrderFilled.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(LimitOrderFilled)).NonIndexed);
+        limitOrderFilled.OrderId.ShouldBe(limitOrderId3);
+        limitOrderFilled.AmountInFilled.ShouldBe(100);
+        limitOrderFilled.AmountOutFilled.ShouldBe(150);
+        var swap = Swap.Swap.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(Swap)).NonIndexed);
+        swap.AmountOut.ShouldBe(50);
+        
+        // pool + order + pool
+        var limitOrderId4 = await UserTomCommitLimitOrder("ELF", "TEST", 1000, 2008);
+        result = await TomHooksStud.SwapTokensForExactTokens.SendAsync(
+            new SwapTokensForExactTokensInput
+            {
+                SwapTokens =
+                {
+                    new SwapTokensForExactTokens
+                    {
+                        AmountInMax = 400000,
+                        AmountOut = 190000,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF" },
+                        FeeRates = { _feeRate }
+                    },
+                }
+            });
+        limitOrderFilled = LimitOrderFilled.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(LimitOrderFilled)).NonIndexed);
+        limitOrderFilled.AmountInFilled.ShouldBe(1000);
+        limitOrderFilled.AmountOutFilled.ShouldBe(2008);
+        limitOrderFilled.OrderId.ShouldBe(limitOrderId4);
+        swap = Swap.Swap.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(Swap)).NonIndexed);
+        swap.AmountOut.ShouldBe(189000);
+        
+        // order + pool + order
+        var limitOrderId5 = await UserTomCommitLimitOrder("ELF", "TEST", 100, 150);
+        var limitOrderId6 = await UserTomCommitLimitOrder("ELF", "TEST", 200000, 403200);
+        result = await TomHooksStud.SwapTokensForExactTokens.SendAsync(
+            new SwapTokensForExactTokensInput()
+            {
+                SwapTokens =
+                {
+                    new SwapTokensForExactTokens
+                    {
+                        AmountInMax = 400000,
+                        AmountOut = 190000,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF" },
+                        FeeRates = { _feeRate }
+                    },
+                }
+            });
+        limitOrderFilled = LimitOrderFilled.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(LimitOrderFilled)).NonIndexed);
+        limitOrderFilled.AmountInFilled.ShouldBe(100);
+        limitOrderFilled.AmountOutFilled.ShouldBe(150);
+        limitOrderFilled.OrderId.ShouldBe(limitOrderId5);
+        swap = Swap.Swap.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(Swap)).NonIndexed);
+        swap.ShouldNotBeNull();
+        result.TransactionResult.Logs.Remove(result.TransactionResult.Logs.First(t => t.Name == nameof(LimitOrderFilled)));
+        var limitOrderFilled2 = LimitOrderFilled.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(LimitOrderFilled)).NonIndexed);
+        limitOrderFilled2.OrderId.ShouldBe(limitOrderId6);
+        var allAmountOut = limitOrderFilled.AmountInFilled + limitOrderFilled2.AmountInFilled + swap.AmountOut;
+        allAmountOut.ShouldBe(190000);
+    }
+    
+    [Fact]
+    public async Task MixSwapTokensForExactTokensAndLimitOrderTest_TwoPair()
+    {
+        await CreateAndAddLiquidity();
+        await AdminHooksStud.SetLimitOrderConfig.SendAsync(new SetLimitOrderConfigInput()
+        {
+            MatchLimitOrderEnabled = true,
+            MultiSwapMatchLimitOrderEnabled = true,
+            MaxFillLimitOrderCount = 50
+        });
+        await AdminHooksStud.SetOrderContract.SendAsync(OrderContractAddress);
+        await AdminOrderStud.Initialize.SendAsync(new Order.InitializeInput
+        {
+            HooksContractAddress = AwakenHooksContractAddress
+        });
+        await UserTomTokenContractStub.Approve.SendAsync(
+            new ApproveInput
+            {
+                Symbol = "ELF",
+                Amount = 10000000,
+                Spender = OrderContractAddress
+            });
+        // (pool + order) + allPool
+        var limitOrderId3 = await UserTomCommitLimitOrder("ELF", "TEST", 10000, 15000);
+        var result = await TomHooksStud.SwapTokensForExactTokens.SendAsync(
+            new SwapTokensForExactTokensInput
+            {
+                SwapTokens =
+                {
+                    new SwapTokensForExactTokens
+                    {
+                        AmountInMax = 200000,
+                        AmountOut = 40000,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF","DAI"},
+                        FeeRates = { _feeRate,_feeRate }
+                    },
+                }
+            });
+        var limitOrderFilled = LimitOrderFilled.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(LimitOrderFilled)).NonIndexed);
+        limitOrderFilled.OrderId.ShouldBe(limitOrderId3);
+        limitOrderFilled.AmountInFilled.ShouldBe(10000);
+        limitOrderFilled.AmountOutFilled.ShouldBe(15000);
+        var swaps = result.TransactionResult.Logs.Where(t => t.Name == nameof(Swap)).ToList();
+        swaps.Count.ShouldBe(2);
+        var firstSwap = Swap.Swap.Parser.ParseFrom(swaps[0].NonIndexed);
+        firstSwap.SymbolIn.ShouldBe("TEST");
+        firstSwap.SymbolOut.ShouldBe("ELF");
+        var secondSwap = Swap.Swap.Parser.ParseFrom(swaps[1].NonIndexed);
+        secondSwap.AmountIn.ShouldBe(10000 + firstSwap.AmountOut);
+        
+        //  allPool + (pool + order)
+        await UserTomTokenContractStub.Approve.SendAsync(
+            new ApproveInput
+            {
+                Symbol = "TEST",
+                Amount = 10000000,
+                Spender = OrderContractAddress
+            });
+        var limitOrderId4 = await UserTomCommitLimitOrder("TEST", "ELF", 250000, 100000);
+        result = await TomHooksStud.SwapTokensForExactTokens.SendAsync(
+            new SwapTokensForExactTokensInput
+            {
+                SwapTokens =
+                {
+                    new SwapTokensForExactTokens
+                    {
+                        AmountInMax = 100000,
+                        AmountOut = 360000,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "DAI","ELF","TEST"},
+                        FeeRates = { _feeRate,_feeRate }
+                    },
+                }
+            });
+        limitOrderFilled = LimitOrderFilled.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(LimitOrderFilled)).NonIndexed);
+        limitOrderFilled.OrderId.ShouldBe(limitOrderId4);
+        limitOrderFilled.AmountInFilled.ShouldBe(250000);
+        limitOrderFilled.AmountOutFilled.ShouldBe(100000);
+        swaps = result.TransactionResult.Logs.Where(t => t.Name == nameof(Swap)).ToList();
+        swaps.Count.ShouldBe(2);
+        firstSwap = Swap.Swap.Parser.ParseFrom(swaps[0].NonIndexed);
+        firstSwap.SymbolIn.ShouldBe("DAI");
+        firstSwap.SymbolOut.ShouldBe("ELF");
+        secondSwap = Swap.Swap.Parser.ParseFrom(swaps[1].NonIndexed);
+        firstSwap.AmountOut.ShouldBe(100000 + secondSwap.AmountIn);
     }
 
     private async Task<long> UserTomCommitLimitOrder()

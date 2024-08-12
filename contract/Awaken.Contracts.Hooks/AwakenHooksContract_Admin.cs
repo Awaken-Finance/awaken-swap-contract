@@ -40,11 +40,15 @@ public partial class AwakenHooksContract
         return new Empty();
     }
 
-    public override Empty SetMatchLimitOrderEnabled(SetMatchLimitOrderEnabledInput input)
+    public override Empty SetLimitOrderConfig(SetLimitOrderConfigInput input)
     {
         CheckAdminPermission();
         State.MatchLimitOrderEnabled.Value = input.MatchLimitOrderEnabled;
         State.MultiSwapMatchLimitOrderEnabled.Value = input.MultiSwapMatchLimitOrderEnabled;
+        if (input.MaxFillLimitOrderCount > 0)
+        {
+            State.MaxFillLimitOrderCount.Value = input.MaxFillLimitOrderCount;
+        }
         return new Empty();
     }
 

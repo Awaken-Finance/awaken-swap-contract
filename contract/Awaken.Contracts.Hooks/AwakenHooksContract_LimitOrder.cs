@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using AElf.Contracts.MultiToken;
 using AElf.Types;
@@ -13,10 +14,11 @@ namespace Awaken.Contracts.Hooks;
 
 public partial class AwakenHooksContract
 {
-    private void MixSwapExactTokensForTokensAndLimitOrder(SwapExactTokensForTokens swapInput, RepeatedField<long> amounts)
+    private void MixSwapExactTokensForTokensAndLimitOrder(SwapExactTokensForTokens swapInput, RepeatedField<long> amounts, 
+        Dictionary<string, FillDetail> fillDetailMap, int maxOrderFillCount, out int orderFilledCount)
     {
+        orderFilledCount = 0;
         var amountsOrder = new RepeatedField<long>();
-        var maxOrderSellPrices = new RepeatedField<long>();
         var amountsPool = new RepeatedField<long>();
         var nextAmountIn = amounts.First();
         var limitOrderMatched = false; 
@@ -24,39 +26,38 @@ public partial class AwakenHooksContract
         {
             var swapContractAddress = GetSwapContractInfo(swapInput.FeeRates[pathCount]).SwapContractAddress;
             MatchLimitOrderByAmountIn(swapContractAddress, swapInput.Path[pathCount], swapInput.Path[pathCount + 1], 
-                nextAmountIn, limitOrderMatched ? 0 : amounts[pathCount + 1],
-                out var amountOutPoolFilled, out var amountInPoolFilled, out var amountOutOrderFilled, out var maxOrderSellPrice);
-            if (pathCount == 0)
-            {
-                amountsPool.Add(amountInPoolFilled);
-                amountsOrder.Add(nextAmountIn - amountInPoolFilled);
-            }
+                nextAmountIn, limitOrderMatched ? 0 : amounts[pathCount + 1], fillDetailMap, maxOrderFillCount,
+                out var amountOutPoolFilled, out var amountInPoolFilled, out var amountOutOrderFilled,
+                out var pairOrderFilledCount);
+            
+            amountsPool.Add(amountInPoolFilled);
             amountsPool.Add(amountOutPoolFilled);
+            amountsOrder.Add(nextAmountIn - amountInPoolFilled);
             amountsOrder.Add(amountOutOrderFilled);
             nextAmountIn = amountOutPoolFilled + amountOutOrderFilled;
             if (amountOutOrderFilled > 0)
             {
                 limitOrderMatched = true;
             }
-            maxOrderSellPrices.Add(maxOrderSellPrice);
+            orderFilledCount += pairOrderFilledCount;
         }
 
         TransferFromSender(swapInput.Path[0], amountsOrder[0] + amountsPool[0], "Hooks Swap");
-        for (var i = 0; i < amountsOrder.Count - 1; i++)
+        for (var i = 0; i < swapInput.FeeRates.Count; i++)
         {
-            if (amountsPool[i] > 0)
+            if (amountsPool[2 * i] > 0)
             {
                 var swapContractAddress = GetSwapContractInfo(swapInput.FeeRates[i]).SwapContractAddress;
                 State.TokenContract.Approve.Send(new ApproveInput()
                 {
                     Spender = swapContractAddress,
                     Symbol = swapInput.Path[i],
-                    Amount = amountsPool[i]
+                    Amount = amountsPool[2 * i]
                 });
                 var swapExactTokensForTokensInput = new Swap.SwapExactTokensForTokensInput()
                 {
-                    AmountIn = amountsPool[i],
-                    AmountOutMin = amountsPool[i + 1],
+                    AmountIn = amountsPool[2 * i],
+                    AmountOutMin = amountsPool[2 * i + 1],
                     Path = { swapInput.Path[i], swapInput.Path[i + 1] },
                     Deadline = swapInput.Deadline,
                     Channel = swapInput.Channel,
@@ -65,54 +66,60 @@ public partial class AwakenHooksContract
                 Context.SendInline(swapContractAddress, nameof(SwapExactTokensForTokens), swapExactTokensForTokensInput.ToByteString());
             }
 
-            if (amountsOrder[i] > 0)
+            if (amountsOrder[2 * i] > 0)
             {
                 State.TokenContract.Approve.Send(new ApproveInput()
                 {
                     Spender = State.OrderContract.Value,
                     Symbol = swapInput.Path[i],
-                    Amount = amountsOrder[i]
+                    Amount = amountsOrder[2 * i]
                 });
                 State.OrderContract.FillLimitOrder.Send(new FillLimitOrderInput
                 {
                     SymbolIn = swapInput.Path[i + 1],
                     SymbolOut = swapInput.Path[i],
-                    AmountIn = amountsOrder[i + 1],
-                    MaxOpenIntervalPrice = maxOrderSellPrices[i],
+                    AmountOut = amountsOrder[2 * i],
+                    MaxCloseIntervalPrice = fillDetailMap[swapInput.Path[i] + "-" + swapInput.Path[i + 1]].Price,
                     To = i == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self
                 });
             }
         }
     }
     private void MatchLimitOrderByAmountIn(Address swapContractAddress, string symbolIn, string symbolOut, long amountIn, long amountOut,
-        out long amountOutPoolFilled, out long amountInPoolFilled, out long amountOutOrderFilled, out long maxOrderSellPrice)
+        Dictionary<string, FillDetail> fillDetailMap, int maxOrderFillCount, 
+        out long amountOutPoolFilled, out long amountInPoolFilled, 
+        out long amountOutOrderFilled, out int orderFilledCount)
     {
         amountInPoolFilled = 0;
         amountOutPoolFilled = 0;
         amountOutOrderFilled = 0L;
-        maxOrderSellPrice = 0L;
+        orderFilledCount = 0;
         var amountInOrderFilled = 0L;
-        var limitOrderSellPrice = State.OrderContract.GetBestSellPrice.Call(new GetBestSellPriceInput
-        {
-            SymbolIn = symbolOut, // u
-            SymbolOut = symbolIn, // elf
-            MinOpenIntervalPrice = 0
-        }).Price;
         if (amountOut == 0)
         {
-            amountOut = Context.Call<Int64Value>(swapContractAddress, "GetAmountOut", new GetAmountOutInput()
-            {
-                SymbolIn = symbolIn,
-                SymbolOut = symbolOut,
-                AmountIn = amountIn
-            }).Value;
+            amountOut = GetAmountOutFromPool(swapContractAddress, symbolIn, symbolOut, amountIn);
         }
+        if (maxOrderFillCount <= 0)
+        {
+            amountInPoolFilled = amountIn;
+            amountOutPoolFilled = amountOut;
+            return;
+        }
+        fillDetailMap.TryGetValue(symbolIn + "-" + symbolOut, out var fillDetail);
+        var limitOrderSellPrice = fillDetail?.Price ?? State.OrderContract.GetBestSellPrice.Call(new GetBestSellPriceInput
+        {
+            SymbolIn = symbolOut,
+            SymbolOut = symbolIn,
+            MinOpenIntervalPrice = 0
+        }).Price;
+        // no limit order
         if (limitOrderSellPrice == 0)
         {
             amountInPoolFilled = amountIn;
             amountOutPoolFilled = amountOut;
             return;
         }
+        
         var maxPollSellPrice = State.OrderContract.CalculatePrice.Call(new CalculatePriceInput
         {
             SymbolOut = symbolIn,
@@ -120,6 +127,7 @@ public partial class AwakenHooksContract
             AmountOut = amountIn,
             AmountIn = amountOut
         }).Value;
+        // pool is better
         if (maxPollSellPrice < limitOrderSellPrice)
         {
             amountInPoolFilled = amountIn;
@@ -127,17 +135,13 @@ public partial class AwakenHooksContract
             return;
         }
 
+        var remainOrderMatched = false;
         var minPoolAmountIn = amountIn / 10;
         while (amountInPoolFilled + amountInOrderFilled < amountIn)
         {
             minPoolAmountIn = Math.Min(minPoolAmountIn, amountIn - amountInPoolFilled - amountInOrderFilled);
             var nextPoolAmountIn = amountInPoolFilled + minPoolAmountIn;
-            var nextPoolAmountOut = Context.Call<Int64Value>(swapContractAddress, "GetAmountOut", new GetAmountOutInput()
-            {
-                SymbolIn = symbolIn,
-                SymbolOut = symbolOut,
-                AmountIn = nextPoolAmountIn
-            }).Value;
+            var nextPoolAmountOut = GetAmountOutFromPool(swapContractAddress, symbolIn, symbolOut, nextPoolAmountIn);
             // cross order price
             var nextPoolSellPrice = State.OrderContract.CalculatePrice.Call(new CalculatePriceInput
             {
@@ -148,22 +152,72 @@ public partial class AwakenHooksContract
             }).Value;
             if (nextPoolSellPrice < limitOrderSellPrice)
             {
+                // pool is better
                 amountInPoolFilled = nextPoolAmountIn;
                 amountOutPoolFilled = nextPoolAmountOut;
                 continue;
             }
+
+            if (!remainOrderMatched && fillDetail?.Price > 0)
+            {
+                //try match remain order at this price
+                remainOrderMatched = true;
+                var singlePriceFillResult = State.OrderContract.GetFillResult.Call(new GetFillResultInput
+                {
+                    SymbolIn = symbolOut,
+                    SymbolOut = symbolIn,
+                    AmountOut = amountIn - amountInPoolFilled - amountInOrderFilled + fillDetail.AmountOut,
+                    MinCloseIntervalPrice = fillDetail.Price,
+                    MaxOpenIntervalPrice = fillDetail.Price + 1,
+                    MaxFillOrderCount = maxOrderFillCount - orderFilledCount
+                });
+                if (singlePriceFillResult.AmountOutFilled > fillDetail.AmountOut)
+                {
+                    amountInOrderFilled += singlePriceFillResult.AmountOutFilled - fillDetail.AmountOut;
+                    amountOutOrderFilled += singlePriceFillResult.AmountInFilled - fillDetail.AmountIn;
+                    orderFilledCount += singlePriceFillResult.OrderFilledCount - fillDetail.OrderFilledCount;
+                    fillDetail.AmountOut = singlePriceFillResult.AmountOutFilled;
+                    fillDetail.AmountIn = singlePriceFillResult.AmountInFilled;
+                    if (amountInOrderFilled + amountInPoolFilled >= amountIn || orderFilledCount >= maxOrderFillCount)
+                    {
+                        break;
+                    }
+                }
+                limitOrderSellPrice = State.OrderContract.GetBestSellPrice.Call(new GetBestSellPriceInput
+                {
+                    SymbolIn = symbolOut,
+                    SymbolOut = symbolIn,
+                    MinOpenIntervalPrice = limitOrderSellPrice
+                }).Price;
+                if (limitOrderSellPrice == 0 || maxPollSellPrice < limitOrderSellPrice)
+                {
+                    break;
+                }
+                continue;
+            }
+            remainOrderMatched = true;
             var fillResult = State.OrderContract.GetFillResult.Call(new GetFillResultInput
             {
                 SymbolIn = symbolOut,
                 SymbolOut = symbolIn,
                 AmountOut = amountIn - amountInPoolFilled - amountInOrderFilled,
                 MinCloseIntervalPrice = limitOrderSellPrice,
-                MaxOpenIntervalPrice = nextPoolSellPrice
+                MaxOpenIntervalPrice = nextPoolSellPrice,
+                MaxFillOrderCount = maxOrderFillCount - orderFilledCount
             });
             amountOutOrderFilled += fillResult.AmountInFilled;
             amountInOrderFilled += fillResult.AmountOutFilled;
-            maxOrderSellPrice = fillResult.MaxPriceFilled;
-            if (amountInOrderFilled + amountInPoolFilled >= amountIn)
+            orderFilledCount += fillResult.OrderFilledCount;
+            if (fillDetail == null)
+            {
+                fillDetail = new FillDetail();
+                fillDetailMap[symbolIn + "-" + symbolOut] = fillDetail;
+            }
+            fillDetail.Price = fillResult.MaxPriceFilled;
+            fillDetail.AmountOut = fillResult.FillDetails.Last().AmountOut;
+            fillDetail.AmountIn = fillResult.FillDetails.Last().AmountIn;
+            
+            if (amountInOrderFilled + amountInPoolFilled >= amountIn || orderFilledCount >= maxOrderFillCount)
             {
                 break;
             }
@@ -175,22 +229,22 @@ public partial class AwakenHooksContract
             }).Price;
             if (limitOrderSellPrice == 0 || maxPollSellPrice < limitOrderSellPrice)
             {
-                amountInPoolFilled = amountIn - amountInOrderFilled;
-                amountOutPoolFilled = Context.Call<Int64Value>(swapContractAddress, "GetAmountOut", new GetAmountOutInput()
-                {
-                    SymbolIn = symbolIn,
-                    SymbolOut = symbolOut,
-                    AmountIn = amountInPoolFilled
-                }).Value;
                 break;
             }
         }
+        if (amountInOrderFilled + amountInPoolFilled != amountIn)
+        {
+            amountInPoolFilled = amountIn - amountInOrderFilled;
+            amountOutPoolFilled =
+                GetAmountOutFromPool(swapContractAddress, symbolIn, symbolOut, amountInPoolFilled);
+        }
     }
     
-    private void MixSwapTokensForExactTokensAndLimitOrder(SwapTokensForExactTokens swapInput, RepeatedField<long> amounts)
+    private void MixSwapTokensForExactTokensAndLimitOrder(SwapTokensForExactTokens swapInput, RepeatedField<long> amounts,
+        Dictionary<string, FillDetail> fillDetailMap, int maxOrderFillCount, out int orderFilledCount)
     {
+        orderFilledCount = 0;
         var amountsOrder = new RepeatedField<long>();
-        var maxOrderSellPrices = new RepeatedField<long>();
         var amountsPool = new RepeatedField<long>();
         var nextAmountOut = amounts.Last();
         var limitOrderMatched = false; 
@@ -198,39 +252,37 @@ public partial class AwakenHooksContract
         {
             var swapContractAddress = GetSwapContractInfo(swapInput.FeeRates[pathCount]).SwapContractAddress;
             MatchLimitOrderByAmountOut(swapContractAddress, swapInput.Path[pathCount], swapInput.Path[pathCount + 1],
-                limitOrderMatched ? 0 : amounts[pathCount],nextAmountOut,
-                out var amountOutPoolFilled, out var amountInPoolFilled, out var amountInOrderFilled, out var maxOrderSellPrice);
-            if (pathCount == swapInput.FeeRates.Count - 1)
-            {
-                amountsPool.Add(amountOutPoolFilled);
-                amountsOrder.Add(nextAmountOut - amountOutPoolFilled);
-            }
+                limitOrderMatched ? 0 : amounts[pathCount],nextAmountOut, fillDetailMap, maxOrderFillCount,
+                out var amountOutPoolFilled, out var amountInPoolFilled, out var amountInOrderFilled, out var pairOrderFilledCount);
+            
+            amountsPool.Insert(0, amountOutPoolFilled);
             amountsPool.Insert(0, amountInPoolFilled);
+            amountsOrder.Insert(0, nextAmountOut - amountOutPoolFilled);
             amountsOrder.Insert(0, amountInOrderFilled);
             nextAmountOut = amountInPoolFilled + amountInOrderFilled;
             if (amountInOrderFilled > 0)
             {
                 limitOrderMatched = true;
             }
-            maxOrderSellPrices.Insert(0, maxOrderSellPrice);
+            orderFilledCount += pairOrderFilledCount;
         }
 
         TransferFromSender(swapInput.Path[0], amountsOrder[0] + amountsPool[0], "Hooks Swap");
-        for (var i = 0; i < amountsOrder.Count - 1; i++)
+        for (var i = 0; i < swapInput.FeeRates.Count; i++)
         {
-            if (amountsPool[i] > 0)
+            if (amountsPool[2 * i] > 0)
             {
                 var swapContractAddress = GetSwapContractInfo(swapInput.FeeRates[i]).SwapContractAddress;
                 State.TokenContract.Approve.Send(new ApproveInput()
                 {
                     Spender = swapContractAddress,
                     Symbol = swapInput.Path[i],
-                    Amount = amountsPool[i]
+                    Amount = amountsPool[2 * i]
                 });
                 var swapTokensForExactTokensInput = new Swap.SwapTokensForExactTokensInput()
                 {
-                    AmountInMax = amountsPool[i],
-                    AmountOut = amountsPool[i + 1],
+                    AmountInMax = amountsPool[2 * i],
+                    AmountOut = amountsPool[2 * i + 1],
                     Path = { swapInput.Path[i], swapInput.Path[i + 1] },
                     Deadline = swapInput.Deadline,
                     Channel = swapInput.Channel,
@@ -239,20 +291,20 @@ public partial class AwakenHooksContract
                 Context.SendInline(swapContractAddress, nameof(SwapTokensForExactTokens), swapTokensForExactTokensInput.ToByteString());
             }
 
-            if (amountsOrder[i] > 0)
+            if (amountsOrder[2 * i] > 0)
             {
                 State.TokenContract.Approve.Send(new ApproveInput()
                 {
                     Spender = State.OrderContract.Value,
                     Symbol = swapInput.Path[i],
-                    Amount = amountsOrder[i]
+                    Amount = amountsOrder[2 * i]
                 });
                 State.OrderContract.FillLimitOrder.Send(new FillLimitOrderInput
                 {
                     SymbolIn = swapInput.Path[i + 1],
                     SymbolOut = swapInput.Path[i],
-                    AmountIn = amountsOrder[i + 1],
-                    MaxOpenIntervalPrice = maxOrderSellPrices[i],
+                    AmountIn = amountsOrder[2 * i + 1],
+                    MaxCloseIntervalPrice = fillDetailMap[swapInput.Path[i] + "-" + swapInput.Path[i + 1]].Price,
                     To = i == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self
                 });
             }
@@ -260,29 +312,33 @@ public partial class AwakenHooksContract
     }
     
     private void MatchLimitOrderByAmountOut(Address swapContractAddress, string symbolIn, string symbolOut, long amountIn, long amountOut, 
-        out long amountOutPoolFilled, out long amountInPoolFilled, out long amountInOrderFilled, out long maxOrderSellPrice)
+        Dictionary<string, FillDetail> fillDetailMap, int maxOrderFillCount,
+        out long amountOutPoolFilled, out long amountInPoolFilled, out long amountInOrderFilled, out int orderFilledCount)
     {
+        orderFilledCount = 0;
         amountInPoolFilled = 0;
         amountOutPoolFilled = 0;
         amountInOrderFilled = 0L;
-        maxOrderSellPrice = 0L;
         var amountOutOrderFilled = 0L;
-        var limitOrderSellPrice = State.OrderContract.GetBestSellPrice.Call(new GetBestSellPriceInput
-        {
-            SymbolIn = symbolOut, // u
-            SymbolOut = symbolIn, // elf
-            MinOpenIntervalPrice = 0
-        }).Price;
         if (amountIn == 0)
         {
-            amountIn = Context.Call<Int64Value>(swapContractAddress, "GetAmountIn", new GetAmountInInput()
-            {
-                SymbolIn = symbolIn,
-                SymbolOut = symbolOut,
-                AmountOut = amountOut
-            }).Value;
+            amountIn = GetAmountInFromPool(swapContractAddress, symbolIn, symbolOut, amountOut);
         }
 
+        if (maxOrderFillCount <= 0)
+        {
+            amountInPoolFilled = amountIn;
+            amountOutPoolFilled = amountOut;
+            return;
+        }
+        fillDetailMap.TryGetValue(symbolIn + "-" + symbolOut, out var fillDetail);
+        var limitOrderSellPrice = fillDetail?.Price ?? State.OrderContract.GetBestSellPrice.Call(new GetBestSellPriceInput
+        {
+            SymbolIn = symbolOut,
+            SymbolOut = symbolIn,
+            MinOpenIntervalPrice = 0
+        }).Price;
+        // no limit order
         if (limitOrderSellPrice == 0)
         {
             amountInPoolFilled = amountIn;
@@ -303,17 +359,13 @@ public partial class AwakenHooksContract
             return;
         }
         
+        var remainOrderMatched = false;
         var minPoolAmountOut = amountOut / 10;
         while (amountOutPoolFilled + amountOutOrderFilled < amountOut)
         {
             minPoolAmountOut = Math.Min(minPoolAmountOut, amountOut - amountOutPoolFilled - amountOutOrderFilled);
             var nextPoolAmountOut = amountOutPoolFilled + minPoolAmountOut;
-            var nextPoolAmountIn = Context.Call<Int64Value>(swapContractAddress, "GetAmountIn", new GetAmountInInput()
-            {
-                SymbolIn = symbolIn,
-                SymbolOut = symbolOut,
-                AmountOut = nextPoolAmountOut
-            }).Value;
+            var nextPoolAmountIn = GetAmountInFromPool(swapContractAddress, symbolIn, symbolOut, nextPoolAmountOut);
             // cross order price
             var nextPoolSellPrice = State.OrderContract.CalculatePrice.Call(new CalculatePriceInput
             {
@@ -328,6 +380,43 @@ public partial class AwakenHooksContract
                 amountInPoolFilled = nextPoolAmountIn;
                 continue;
             }
+            if (!remainOrderMatched && fillDetail?.Price > 0)
+            {
+                //try match remain order at this price
+                remainOrderMatched = true;
+                var singlePriceFillResult = State.OrderContract.GetFillResult.Call(new GetFillResultInput
+                {
+                    SymbolIn = symbolOut,
+                    SymbolOut = symbolIn,
+                    AmountIn = amountOut - amountOutPoolFilled - amountOutOrderFilled + fillDetail.AmountIn,
+                    MinCloseIntervalPrice = fillDetail.Price,
+                    MaxOpenIntervalPrice = fillDetail.Price + 1,
+                    MaxFillOrderCount = maxOrderFillCount - orderFilledCount
+                });
+                if (singlePriceFillResult.AmountInFilled > fillDetail.AmountIn)
+                {
+                    amountInOrderFilled += singlePriceFillResult.AmountOutFilled - fillDetail.AmountOut;
+                    amountOutOrderFilled += singlePriceFillResult.AmountInFilled - fillDetail.AmountIn;
+                    orderFilledCount += singlePriceFillResult.OrderFilledCount - fillDetail.OrderFilledCount;
+                    fillDetail.AmountIn = singlePriceFillResult.AmountInFilled;
+                    if (amountOutOrderFilled + amountOutPoolFilled >= amountOut || orderFilledCount >= maxOrderFillCount)
+                    {
+                        break;
+                    }
+                }
+                limitOrderSellPrice = State.OrderContract.GetBestSellPrice.Call(new GetBestSellPriceInput
+                {
+                    SymbolIn = symbolOut,
+                    SymbolOut = symbolIn,
+                    MinOpenIntervalPrice = limitOrderSellPrice
+                }).Price;
+                if (limitOrderSellPrice == 0 || maxPollSellPrice < limitOrderSellPrice)
+                {
+                    break;
+                }
+                continue;
+            }
+            remainOrderMatched = true;
             var fillResult = State.OrderContract.GetFillResult.Call(new GetFillResultInput
             {
                 SymbolIn = symbolOut,
@@ -338,8 +427,15 @@ public partial class AwakenHooksContract
             });
             amountOutOrderFilled += fillResult.AmountInFilled;
             amountInOrderFilled += fillResult.AmountOutFilled;
-            maxOrderSellPrice = fillResult.MaxPriceFilled;
-            if (amountOutOrderFilled + amountOutPoolFilled >= amountOut)
+            orderFilledCount += fillResult.OrderFilledCount;
+            if (fillDetail == null)
+            {
+                fillDetail = new FillDetail();
+                fillDetailMap[symbolIn + "-" + symbolOut] = fillDetail;
+            }
+            fillDetail.Price = fillResult.MaxPriceFilled;
+            fillDetail.AmountIn = fillResult.FillDetails.Last().AmountIn;
+            if (amountOutOrderFilled + amountOutPoolFilled >= amountOut || orderFilledCount >= maxOrderFillCount)
             {
                 break;
             }
@@ -351,15 +447,34 @@ public partial class AwakenHooksContract
             }).Price;
             if (limitOrderSellPrice == 0 || maxPollSellPrice < limitOrderSellPrice)
             {
-                amountOutPoolFilled = amountOut - amountOutOrderFilled;
-                amountInPoolFilled = Context.Call<Int64Value>(swapContractAddress, "GetAmountIn", new GetAmountInInput()
-                {
-                    SymbolIn = symbolIn,
-                    SymbolOut = symbolOut,
-                    AmountOut = amountOutPoolFilled
-                }).Value;
                 break;
             }
         }
+
+        if (amountOutOrderFilled + amountOutPoolFilled != amountOut)
+        {
+            amountOutPoolFilled = amountOut - amountOutOrderFilled;
+            amountInPoolFilled = GetAmountInFromPool(swapContractAddress, symbolIn, symbolOut, amountOutPoolFilled);
+        }
+    }
+
+    private long GetAmountOutFromPool(Address swapContractAddress, string symbolIn, string symbolOut, long amountIn)
+    {
+        return Context.Call<Int64Value>(swapContractAddress, "GetAmountOut", new GetAmountOutInput
+        {
+            SymbolIn = symbolIn,
+            SymbolOut = symbolOut,
+            AmountIn = amountIn
+        }).Value;
+    }
+    
+    private long GetAmountInFromPool(Address swapContractAddress, string symbolIn, string symbolOut, long amountOut)
+    {
+        return Context.Call<Int64Value>(swapContractAddress, "GetAmountIn", new GetAmountInInput()
+        {
+            SymbolIn = symbolIn,
+            SymbolOut = symbolOut,
+            AmountOut = amountOut
+        }).Value;
     }
 }

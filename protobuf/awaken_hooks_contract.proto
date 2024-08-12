@@ -31,7 +31,7 @@ service AwakenHooksContract {
   }
   rpc RemoveSwapContractInfo (RemoveSwapContractInfoInput) returns (google.protobuf.Empty) {
   }
-  rpc SetMatchLimitOrderEnabled(SetMatchLimitOrderEnabledInput) returns (google.protobuf.Empty) {
+  rpc SetLimitOrderConfig(SetLimitOrderConfigInput) returns (google.protobuf.Empty) {
   }
   rpc SetOrderContract(aelf.Address) returns (google.protobuf.Empty) {
   }
@@ -52,10 +52,7 @@ service AwakenHooksContract {
   rpc GetAllReverse (GetAllReverseInput) returns (GetAllReverseOutput) {
     option (aelf.is_view) = true;
   }
-  rpc GetMatchLimitOrderEnabled(google.protobuf.Empty) returns (GetMatchLimitOrderEnabledOutput) {
-    option (aelf.is_view) = true;
-  }
-  rpc GetPrice(GetPriceInput) returns (google.protobuf.Int64Value) {
+  rpc GetLimitOrderConfig(google.protobuf.Empty) returns (GetLimitOrderConfigOutput) {
     option (aelf.is_view) = true;
   }
   rpc GetOrderContract(google.protobuf.Empty) returns (aelf.Address) {
@@ -76,19 +73,16 @@ message RemoveSwapContractInfoInput {
   repeated int64 fee_rates = 1;
 }
 
-message SetMatchLimitOrderEnabledInput {
+message SetLimitOrderConfigInput {
   bool match_limit_order_enabled = 1;
   bool multi_swap_match_limit_order_enabled = 2;
+  int32 max_fill_limit_order_count = 3;
 }
 
-message GetMatchLimitOrderEnabledOutput {
+message GetLimitOrderConfigOutput {
   bool match_limit_order_enabled = 1;
   bool multi_swap_match_limit_order_enabled = 2;
-}
-
-message GetPriceInput {
-  string symbol_a = 1;
-  string symbol_b = 2;
+  int32 max_fill_limit_order_count = 3;
 }
 
 message SwapContractInfo {

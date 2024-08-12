@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using AElf.Contracts.MultiToken;
 using AElf.Sdk.CSharp;
+using Awaken.Contracts.Order;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using TransferFromInput = Awaken.Contracts.Token.TransferFromInput;
@@ -28,15 +30,18 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
     public override Empty SwapExactTokensForTokens(SwapExactTokensForTokensInput input)
     {
         Assert(input.SwapTokens.Count > 0, "Invalid input.");
+        var limitOrderFillDetailMap = new Dictionary<string, FillDetail>();
+        var maxFillCount = State.MaxFillLimitOrderCount.Value;
         foreach (var swapInput in input.SwapTokens)
         {
             var amounts = GetAmountsOut(swapInput.AmountIn, swapInput.Path, swapInput.FeeRates);
             Assert(amounts[amounts.Count - 1] >= swapInput.AmountOutMin, "Insufficient Output amount");
             
-            if (State.MatchLimitOrderEnabled.Value &&
+            if (maxFillCount > 0 && State.MatchLimitOrderEnabled.Value &&
                 (swapInput.FeeRates.Count == 1 || State.MultiSwapMatchLimitOrderEnabled.Value))
             {
-                MixSwapExactTokensForTokensAndLimitOrder(swapInput, amounts);
+                MixSwapExactTokensForTokensAndLimitOrder(swapInput, amounts, limitOrderFillDetailMap, maxFillCount, out var orderFilledCount);
+                maxFillCount -= orderFilledCount;
                 continue;
             }
             
@@ -79,15 +84,18 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
     public override Empty SwapTokensForExactTokens(SwapTokensForExactTokensInput input)
     {
         Assert(input.SwapTokens.Count > 0, "Invalid input.");
+        var limitOrderFillDetailMap = new Dictionary<string, FillDetail>();
+        var maxFillCount = State.MaxFillLimitOrderCount.Value;
         foreach (var swapInput in input.SwapTokens)
         {
             var amounts = GetAmountsIn(swapInput.AmountOut, swapInput.Path, swapInput.FeeRates);
             Assert(amounts[0] <= swapInput.AmountInMax, "Excessive Input amount");
 
-            if (State.MatchLimitOrderEnabled.Value &&
+            if (maxFillCount > 0 && State.MatchLimitOrderEnabled.Value &&
                 (swapInput.FeeRates.Count == 1 || State.MultiSwapMatchLimitOrderEnabled.Value))
             {
-                MixSwapTokensForExactTokensAndLimitOrder(swapInput, amounts);
+                MixSwapTokensForExactTokensAndLimitOrder(swapInput, amounts, limitOrderFillDetailMap, maxFillCount, out int orderFilledCount);
+                maxFillCount -= orderFilledCount;
                 continue;
             }
 

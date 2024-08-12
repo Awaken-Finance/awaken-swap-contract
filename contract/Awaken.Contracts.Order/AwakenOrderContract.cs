@@ -43,7 +43,7 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
             SymbolIn = input.SymbolIn,
             SymbolOut = input.SymbolOut
         };
-        for (var i = 1; i <= 30; i++)
+        for (var i = 0; i < orderBookConfig.MaxOrderBooksEachPrice - 1; i++)
         {
             if (orderBook.UserLimitOrders.Count < orderBookConfig.MaxOrdersEachOrderBook)
             {
@@ -115,6 +115,15 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         Assert(priceBook?.PriceList != null, "Price book not existed.");
         var orderCount = 0;
         var amountInUsed = 0L;
+        var amountOutUsed = 0L;
+        if (input.AmountIn == 0)
+        {
+            input.AmountIn = long.MaxValue;
+        }
+        if (input.AmountOut == 0)
+        {
+            input.AmountOut = long.MaxValue;
+        }
         
         var breakOuterLoop = false;
         while (!breakOuterLoop)
@@ -122,16 +131,17 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
             var removePricesCount = 0;
             foreach (var sellPrice in priceBook.PriceList.Prices)
             {
-                if (input.MaxOpenIntervalPrice < sellPrice)
+                if (input.MaxCloseIntervalPrice < sellPrice)
                 {
                     breakOuterLoop = true;
                     break;
                 }
                 var headerOrderBookId = State.OrderBookIdMap[input.SymbolIn][input.SymbolOut][sellPrice];
                 var headerOrderBook = State.OrderBookMap[headerOrderBookId];
-                var curOrderBook = FillOrderBookList(headerOrderBook, input.To,input.AmountIn - amountInUsed, 
-                    orderBookConfig.MaxFillOrderCount - orderCount,  out var amountInFilled, out var orderFilledCount);
+                var curOrderBook = FillOrderBookList(headerOrderBook, input.To,input.AmountIn - amountInUsed, input.AmountOut - amountOutUsed,
+                    orderBookConfig.MaxFillOrderCount - orderCount,  out var amountInFilled,  out var amountOutFilled, out var orderFilledCount);
                 amountInUsed += amountInFilled;
+                amountOutUsed += amountOutFilled;
                 orderCount += orderFilledCount;
                 if (curOrderBook == null)
                 {
@@ -143,7 +153,7 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
                     State.OrderBookIdMap[input.SymbolIn][input.SymbolOut][sellPrice] = curOrderBook.OrderBookId;
                 }
                 
-                if (amountInUsed >= input.AmountIn || orderCount >= orderBookConfig.MaxFillOrderCount)
+                if (amountInUsed >= input.AmountIn || amountOutUsed >= input.AmountOut || orderCount >= orderBookConfig.MaxFillOrderCount)
                 {
                     breakOuterLoop = true;
                     break;
@@ -176,10 +186,11 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         return new Empty();
     }
     
-    private OrderBook FillOrderBookList(OrderBook headerOrderBook, Address to, long maxAmountInFilled, int maxFillOrderCount, 
-        out long amountInFilled, out int orderFilledCount)
+    private OrderBook FillOrderBookList(OrderBook headerOrderBook, Address to, long maxAmountInFilled, long maxAmountOutFilled, int maxFillOrderCount, 
+        out long amountInFilled, out long amountOutFilled, out int orderFilledCount)
     {
         amountInFilled = 0;
+        amountOutFilled = 0;
         orderFilledCount = 0;
         if (headerOrderBook == null)
         {
@@ -187,11 +198,12 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         }
         var orderBook = headerOrderBook;
 
-        while (amountInFilled < maxAmountInFilled && orderFilledCount < maxFillOrderCount)
+        while (amountInFilled < maxAmountInFilled && amountOutFilled < maxAmountOutFilled && orderFilledCount < maxFillOrderCount)
         {
-            FillOrderBook(orderBook, to, maxAmountInFilled - amountInFilled, maxFillOrderCount - orderFilledCount,
-                out var amountInFilledThisBook, out var orderFilledCountThisBook);
+            FillOrderBook(orderBook, to, maxAmountInFilled - amountInFilled, maxAmountOutFilled - amountOutFilled, maxFillOrderCount - orderFilledCount,
+                out var amountInFilledThisBook, out var amountOutFilledThisBook, out var orderFilledCountThisBook);
             amountInFilled += amountInFilledThisBook;
+            amountOutFilled += amountOutFilledThisBook;
             orderFilledCount += orderFilledCountThisBook;
             if (orderBook.UserLimitOrders.Count == 0)
             {
@@ -233,10 +245,11 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         }
     }
 
-    private void FillOrderBook(OrderBook orderBook, Address to, long maxAmountInFilled, int maxFillOrderCount, out long amountInFilled, 
-        out int orderFilledCount)
+    private void FillOrderBook(OrderBook orderBook, Address to, long maxAmountInFilled, long maxAmountOutFilled, int maxFillOrderCount, 
+        out long amountInFilled, out long amountOutFilled, out int orderFilledCount)
     {
         amountInFilled = 0;
+        amountOutFilled = 0;
         orderFilledCount = 0;
         var orderNeedRemoveCount = 0;
         foreach (var userLimitOrder in orderBook.UserLimitOrders)
@@ -261,7 +274,17 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
             {
                 throw new AssertionException($"Failed to parse {amountOutStr}");
             }
+            if (amountOut > maxAmountOutFilled - amountOutFilled)
+            {
+                amountOut = maxAmountOutFilled - amountOutFilled;
+                var amountInStr = new BigIntValue(userLimitOrder.AmountIn).Mul(amountOut).Div(userLimitOrder.AmountOut).Value;
+                if (!long.TryParse(amountInStr, out amountIn))
+                {
+                    throw new AssertionException($"Failed to parse {amountInStr}");
+                }
+            }
             amountInFilled += amountIn;
+            amountOutFilled += amountOut;
             
             SwapInternal(userLimitOrder.Maker, to, orderBook.SymbolIn, orderBook.SymbolOut, amountIn, amountOut);
             userLimitOrder.AmountInFilled += amountIn;
@@ -281,7 +304,7 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
                 State.OrderIdToOrderBookIdMap.Remove(userLimitOrder.OrderId);
             }
 
-            if (amountInFilled >= maxAmountInFilled || orderFilledCount >= maxFillOrderCount)
+            if (amountInFilled >= maxAmountInFilled || amountOutFilled >= maxAmountOutFilled || orderFilledCount >= maxFillOrderCount)
             {
                 break;
             }
