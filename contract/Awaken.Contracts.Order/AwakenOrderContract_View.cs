@@ -71,12 +71,15 @@ public partial class AwakenOrderContract
         {
             return result;
         }
+
+        var fillByAmountIn = false;
         if (input.AmountIn == 0)
         {
             input.AmountIn = long.MaxValue;
         }
         if (input.AmountOut == 0)
         {
+            fillByAmountIn = true;
             input.AmountOut = long.MaxValue;
         }
 
@@ -107,7 +110,7 @@ public partial class AwakenOrderContract
                 var headerOrderBookId = State.OrderBookIdMap[input.SymbolIn][input.SymbolOut][sellPrice];
                 var headerOrderBook = State.OrderBookMap[headerOrderBookId];
                 TryFillOrderBookList(headerOrderBook, input.AmountIn - result.AmountInFilled, input.AmountOut - result.AmountOutFilled,
-                    maxOrderFillCount - result.OrderFilledCount,  out var amountInFilled, 
+                    maxOrderFillCount - result.OrderFilledCount,  fillByAmountIn, out var amountInFilled, 
                     out var amountOutFilled, out var orderFilledCount);
                 result.AmountInFilled += amountInFilled;
                 result.AmountOutFilled += amountOutFilled;

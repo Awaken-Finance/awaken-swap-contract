@@ -45,7 +45,7 @@ public partial class AwakenHooksContract
         TransferFromSender(swapInput.Path[0], amountsOrder[0] + amountsPool[0], "Hooks Swap");
         for (var i = 0; i < swapInput.FeeRates.Count; i++)
         {
-            if (amountsPool[2 * i] > 0)
+            if (amountsPool[2 * i] > 0 && amountsPool[2 * i + 1] > 0)
             {
                 var swapContractAddress = GetSwapContractInfo(swapInput.FeeRates[i]).SwapContractAddress;
                 State.TokenContract.Approve.Send(new ApproveInput()
@@ -66,7 +66,7 @@ public partial class AwakenHooksContract
                 Context.SendInline(swapContractAddress, nameof(SwapExactTokensForTokens), swapExactTokensForTokensInput.ToByteString());
             }
 
-            if (amountsOrder[2 * i] > 0)
+            if (amountsOrder[2 * i] > 0 && amountsOrder[2 * i + 1] > 0)
             {
                 State.TokenContract.Approve.Send(new ApproveInput()
                 {
@@ -270,7 +270,7 @@ public partial class AwakenHooksContract
         TransferFromSender(swapInput.Path[0], amountsOrder[0] + amountsPool[0], "Hooks Swap");
         for (var i = 0; i < swapInput.FeeRates.Count; i++)
         {
-            if (amountsPool[2 * i] > 0)
+            if (amountsPool[2 * i] > 0 && amountsPool[2 * i + 1] > 0)
             {
                 var swapContractAddress = GetSwapContractInfo(swapInput.FeeRates[i]).SwapContractAddress;
                 State.TokenContract.Approve.Send(new ApproveInput()
@@ -291,7 +291,7 @@ public partial class AwakenHooksContract
                 Context.SendInline(swapContractAddress, nameof(SwapTokensForExactTokens), swapTokensForExactTokensInput.ToByteString());
             }
 
-            if (amountsOrder[2 * i] > 0)
+            if (amountsOrder[2 * i] > 0 && amountsOrder[2 * i] > 0)
             {
                 State.TokenContract.Approve.Send(new ApproveInput()
                 {

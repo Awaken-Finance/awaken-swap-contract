@@ -866,7 +866,7 @@ public partial class AwakenHooksContractTests
             });
 
         var limitOrderId1 = await UserTomCommitLimitOrder("ELF", "TEST", 200, 300);
-        var limitOrderId2 = await UserTomCommitLimitOrder("ELF", "TEST", 200, 320);
+        var limitOrderId2 = await UserTomCommitLimitOrder("ELF", "TEST", 12, 20);
         
         await UserTomTokenContractStub.Approve.SendAsync(
             new ApproveInput
@@ -912,7 +912,82 @@ public partial class AwakenHooksContractTests
         orderFilled2.AmountOutFilled.ShouldBe(150);
         orderFilled2.AmountInFilled.ShouldBe(100);
         orderFilled2.OrderId.ShouldBe(limitOrderId1);
-        orderFilled3.AmountOutFilled.ShouldBe(20);
+        orderFilled3.AmountOutFilled.ShouldBe(19);
+        orderFilled3.AmountInFilled.ShouldBe(12);
+        orderFilled3.OrderId.ShouldBe(limitOrderId2);
+    }
+    
+    [Fact]
+    public async Task RepeatedSwapTokensForExactTokensAndLimitOrderTest()
+    {
+        await CreateAndAddLiquidity();
+        await AdminHooksStud.SetLimitOrderConfig.SendAsync(new SetLimitOrderConfigInput()
+        {
+            MatchLimitOrderEnabled = true,
+            MultiSwapMatchLimitOrderEnabled = true,
+            MaxFillLimitOrderCount = 50
+        });
+        await AdminHooksStud.SetOrderContract.SendAsync(OrderContractAddress);
+        await AdminOrderStud.Initialize.SendAsync(new Order.InitializeInput
+        {
+            HooksContractAddress = AwakenHooksContractAddress
+        });
+        await UserTomTokenContractStub.Approve.SendAsync(
+            new ApproveInput
+            {
+                Symbol = "ELF",
+                Amount = 10000000,
+                Spender = OrderContractAddress
+            });
+
+        var limitOrderId1 = await UserTomCommitLimitOrder("ELF", "TEST", 200, 300);
+        var limitOrderId2 = await UserTomCommitLimitOrder("ELF", "TEST", 12, 20);
+        
+        await UserTomTokenContractStub.Approve.SendAsync(
+            new ApproveInput
+            {
+                Symbol = "TEST",
+                Amount = 10000000,
+                Spender = AwakenHooksContractAddress
+            });
+        var result = await TomHooksStud.SwapTokensForExactTokens.SendAsync(
+            new SwapTokensForExactTokensInput()
+            {
+                SwapTokens =
+                {
+                    new SwapTokensForExactTokens
+                    {
+                        AmountInMax = 250,
+                        AmountOut = 100,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF" },
+                        FeeRates = { _feeRate }
+                    },
+                    new SwapTokensForExactTokens
+                    {
+                        AmountInMax = 280,
+                        AmountOut = 112,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF" },
+                        FeeRates = { _feeRate }
+                    }
+                }
+            });
+        var limitOrderFilled = result.TransactionResult.Logs.Where(t => t.Name == nameof(LimitOrderFilled)).ToList();
+        var orderFilled1 = LimitOrderFilled.Parser.ParseFrom(limitOrderFilled[0].NonIndexed);
+        var orderFilled2 = LimitOrderFilled.Parser.ParseFrom(limitOrderFilled[1].NonIndexed);
+        var orderFilled3 = LimitOrderFilled.Parser.ParseFrom(limitOrderFilled[2].NonIndexed);
+        orderFilled1.AmountOutFilled.ShouldBe(150);
+        orderFilled1.AmountInFilled.ShouldBe(100);
+        orderFilled1.OrderId.ShouldBe(limitOrderId1);
+        orderFilled2.AmountOutFilled.ShouldBe(150);
+        orderFilled2.AmountInFilled.ShouldBe(100);
+        orderFilled2.OrderId.ShouldBe(limitOrderId1);
+        orderFilled3.AmountOutFilled.ShouldBe(19);
         orderFilled3.AmountInFilled.ShouldBe(12);
         orderFilled3.OrderId.ShouldBe(limitOrderId2);
     }
