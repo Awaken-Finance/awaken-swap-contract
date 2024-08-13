@@ -111,7 +111,11 @@ public partial class AwakenHooksContractTests
     [Fact]
     public async Task CreateLimitOrderTest_Failed()
     {
-        await InitializeOrderContract();
+        await CreateAndAddLiquidity();
+        await AdminOrderStud.Initialize.SendAsync(new Order.InitializeInput
+        {
+            HooksContractAddress = AwakenHooksContractAddress
+        });
         var result = await LilyOrderStud.CommitLimitOrder.SendWithExceptionAsync(new CommitLimitOrderInput()
         {
             SymbolIn = "DAI",
@@ -137,6 +141,45 @@ public partial class AwakenHooksContractTests
             Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 1, 0)))
         });
         result.TransactionResult.Error.ShouldContain("Balance not enough");
+        
+        result = await LilyOrderStud.CommitLimitOrder.SendWithExceptionAsync(new CommitLimitOrderInput()
+        {
+            SymbolIn = "DAI",
+            SymbolOut = "TEST",
+            AmountIn = 100,
+            AmountOut = 200,
+            Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, -1, 0)))
+        });
+        result.TransactionResult.Error.ShouldContain("Invalid input");
+        
+        await AdminOrderStud.SetCommitPriceConfig.SendAsync(new SetCommitPriceConfigInput
+        {
+            CheckCommitPriceEnabled = true,
+            CommitPriceIncreaseRate = 5000
+        });
+        await UserTomTokenContractStub.Approve.SendAsync(new ApproveInput
+        {
+            Symbol = "ELF",
+            Amount = 100,
+            Spender = OrderContractAddress
+        });
+        result = await TomOrderStud.CommitLimitOrder.SendWithExceptionAsync(new CommitLimitOrderInput()
+        {
+            SymbolIn = "ELF",
+            SymbolOut = "TEST",
+            AmountIn = 100,
+            AmountOut = 200,
+            Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 1, 0)))
+        });
+        result.TransactionResult.Error.ShouldContain("Invalid sell price.");
+        await TomOrderStud.CommitLimitOrder.SendAsync(new CommitLimitOrderInput()
+        {
+            SymbolIn = "ELF",
+            SymbolOut = "TEST",
+            AmountIn = 100,
+            AmountOut = 400,
+            Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 1, 0)))
+        });
     }
 
     [Fact]
@@ -1274,7 +1317,7 @@ public partial class AwakenHooksContractTests
 
     private async Task InitializeOrderContract()
     {
-        await CreateAndGetToken();
+        await CreateAndAddLiquidity();
         await AdminOrderStud.Initialize.SendAsync(new Order.InitializeInput
         {
             HooksContractAddress = AwakenHooksContractAddress

@@ -9,5 +9,6 @@ public partial class AwakenOrderContract
     private const int MaxFillOrderCount = 50;
     private const long PriceMultiple = 100000000;
     private const long ErasePriceMultiple = 10000;
-    private const long MinOrderValueInUsdt = 1000000000;
+    private const int UserPendingOrdersLimit = 30;
+    private const int IncreaseRateMax = 10000;
 }

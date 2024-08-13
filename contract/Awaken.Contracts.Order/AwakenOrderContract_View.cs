@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Linq;
+using AElf.Types;
 using Google.Protobuf.WellKnownTypes;
 
 namespace Awaken.Contracts.Order;
@@ -94,6 +96,7 @@ public partial class AwakenOrderContract
         var maxOrderFillCount =
             input.MaxFillOrderCount == 0 ? orderBookConfig.MaxFillOrderCount : input.MaxFillOrderCount;
         var priceBook = FindPriceBook(headerPriceBook, input.MinCloseIntervalPrice);
+        var userBalanceUsedMap = new Dictionary<Address, long>();
         while (result.AmountInFilled < input.AmountIn && result.AmountOutFilled < input.AmountOut)
         {
             foreach (var sellPrice in priceBook.PriceList.Prices)
@@ -110,8 +113,8 @@ public partial class AwakenOrderContract
                 var headerOrderBookId = State.OrderBookIdMap[input.SymbolIn][input.SymbolOut][sellPrice];
                 var headerOrderBook = State.OrderBookMap[headerOrderBookId];
                 TryFillOrderBookList(headerOrderBook, input.AmountIn - result.AmountInFilled, input.AmountOut - result.AmountOutFilled,
-                    maxOrderFillCount - result.OrderFilledCount,  fillByAmountIn, out var amountInFilled, 
-                    out var amountOutFilled, out var orderFilledCount);
+                    maxOrderFillCount - result.OrderFilledCount,  fillByAmountIn, userBalanceUsedMap, 
+                    out var amountInFilled, out var amountOutFilled, out var orderFilledCount);
                 result.AmountInFilled += amountInFilled;
                 result.AmountOutFilled += amountOutFilled;
                 result.OrderFilledCount += orderFilledCount;

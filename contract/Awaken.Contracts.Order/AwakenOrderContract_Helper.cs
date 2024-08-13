@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using AElf.Contracts.MultiToken;
 using AElf.CSharp.Core;
@@ -54,9 +55,11 @@ public partial class AwakenOrderContract
         Assert(balance.Balance >= amount, "Balance not enough");
     }
     
-    private bool CheckAllowanceAndBalance(Address owner, string symbol, long amount, out ReasonType reasonType)
+    private bool CheckAllowanceAndBalance(Address owner, string symbol, long amount, out ReasonType reasonType, Dictionary<Address, long> userBalanceUsedMap = null)
     {
         reasonType = ReasonType.Expired;
+        var amountUsed = userBalanceUsedMap?.GetValueOrDefault(owner, 0) ?? 0;
+        amount += amountUsed;
         var allowance = State.TokenContract.GetAllowance.Call(new GetAllowanceInput
         {
             Spender = Context.Self,

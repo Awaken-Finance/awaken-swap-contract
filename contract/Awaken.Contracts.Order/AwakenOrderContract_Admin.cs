@@ -23,6 +23,8 @@ public partial class AwakenOrderContract
             Context.GetContractAddressByName(SmartContractConstants.TokenContractSystemName);
         State.Admin.Value = input.Admin ?? Context.Sender;
         InitOrderBookConfig();
+        State.CheckCommitPriceEnabled.Value = input.CheckCommitPriceEnabled;
+        State.CommitPriceIncreaseRate.Value = input.CommitPriceIncreaseRate;
         State.Initialized.Value = true;
         return new Empty();
     }
@@ -34,11 +36,11 @@ public partial class AwakenOrderContract
             MaxOrdersEachOrderBook = MaxOrdersEachOrderBook,
             MaxPricesEachPriceBook = MaxPricesEachPriceBook,
             MaxFillOrderCount = MaxFillOrderCount,
-            MinOrderValueInUsdt = MinOrderValueInUsdt,
             PriceMultiple = PriceMultiple,
             ErasePriceMultiple = ErasePriceMultiple,
             MaxOrderBooksEachPrice =MaxOrderBooksEachPrice,
-            MaxPriceBooksEachTradePair = MaxPriceBooksEachTradePair
+            MaxPriceBooksEachTradePair = MaxPriceBooksEachTradePair,
+            UserPendingOrdersLimit = UserPendingOrdersLimit
         };
     }
     
@@ -75,11 +77,18 @@ public partial class AwakenOrderContract
         {
             orderBookConfig.ErasePriceMultiple = input.OrderBookConfig.ErasePriceMultiple;
         }
-        if (input.OrderBookConfig.MinOrderValueInUsdt > 0)
+        if (input.OrderBookConfig.UserPendingOrdersLimit > 0)
         {
-            orderBookConfig.MinOrderValueInUsdt = input.OrderBookConfig.MinOrderValueInUsdt;
+            orderBookConfig.UserPendingOrdersLimit = input.OrderBookConfig.UserPendingOrdersLimit;
         }
+        return new Empty();
+    }
 
+    public override Empty SetCommitPriceConfig(SetCommitPriceConfigInput input)
+    {
+        AssertSenderIsAdmin();
+        State.CheckCommitPriceEnabled.Value = input.CheckCommitPriceEnabled;
+        State.CommitPriceIncreaseRate.Value = input.CommitPriceIncreaseRate;
         return new Empty();
     }
 

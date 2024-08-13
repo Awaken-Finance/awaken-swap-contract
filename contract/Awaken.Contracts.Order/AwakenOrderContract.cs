@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using AElf.Contracts.MultiToken;
 using AElf.CSharp.Core;
 using AElf.Sdk.CSharp;
 using AElf.Types;
+using Awaken.Contracts.Hooks;
 using Google.Protobuf.WellKnownTypes;
 
 namespace Awaken.Contracts.Order;
@@ -12,11 +14,30 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
 {
     public override Empty CommitLimitOrder(CommitLimitOrderInput input)
     {
-        Assert(input.AmountIn > 0 && input.AmountOut > 0, "Invalid input.");
+        Assert(input.AmountIn > 0 && input.AmountOut > 0 && input.Deadline > Context.CurrentBlockTime, "Invalid input.");
         AssertContractInitialized();
         var orderBookConfig = State.OrderBookConfig.Value;
         AssertAllowanceAndBalance(input.SymbolIn, input.AmountIn);
+        var orderIdList = State.UserLimitOrderIdsMap[Context.Sender];
+        Assert(orderIdList == null || orderIdList.LimitOrderIds.Count < orderBookConfig.UserPendingOrdersLimit, "Pending orders count limit.");
         CalculatePrice(input.SymbolIn, input.SymbolOut, input.AmountIn, input.AmountOut, true, out var price, out var realAmountOut);
+        var allReverseOutput = State.HooksContract.GetAllReverse.Call(new GetAllReverseInput
+        {
+            SymbolA = input.SymbolIn,
+            SymbolB = input.SymbolOut
+        });
+        Assert(allReverseOutput.Reverses.Count > 0, "Trade pair not exist.");
+        if (State.CheckCommitPriceEnabled.Value)
+        {
+            foreach (var reverse in allReverseOutput.Reverses)
+            {
+                // reverseB/reverseA * 1.005 < amountOut / amountIn
+                var left = new BigIntValue(reverse.ReverseB).Mul(input.AmountIn).Mul(IncreaseRateMax + State.CommitPriceIncreaseRate.Value);
+                var right = new BigIntValue(input.AmountOut).Mul(reverse.ReverseA).Mul(IncreaseRateMax);
+                Assert(left <= right, "Invalid sell price.");
+            }
+        }
+
         var headOrderBookId = State.OrderBookIdMap[input.SymbolIn][input.SymbolOut][price];
         if (headOrderBookId == 0)
         {
@@ -68,6 +89,10 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         orderBook.UserLimitOrders.Add(limitOrder);
         State.OrderBookMap[orderBook.OrderBookId] = orderBook;
         State.OrderIdToOrderBookIdMap[limitOrder.OrderId] = orderBook.OrderBookId;
+        
+        orderIdList ??= new LimitOrderIdList();
+        orderIdList.LimitOrderIds.Add(lastOrderId);
+        State.UserLimitOrderIdsMap[Context.Sender] = orderIdList;
         Context.Fire(new LimitOrderCreated
         {
             SymbolIn = input.SymbolIn,
@@ -93,6 +118,7 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         Assert(userLimitOrder.Maker == Context.Sender, "No permission.");
         orderBook.UserLimitOrders.Remove(userLimitOrder);
         State.OrderIdToOrderBookIdMap.Remove(input.OrderId);
+        State.UserLimitOrderIdsMap[Context.Sender]?.LimitOrderIds.Remove(input.OrderId);
         Context.Fire(new LimitOrderCancelled
         {
             CancelTime = Context.CurrentBlockTime,
@@ -222,7 +248,7 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
     }
     
     private void TryFillOrderBookList(OrderBook headerOrderBook, long maxAmountInFilled, long maxAmountOutFilled, int maxFillOrderCount, 
-        bool fillByAmountIn, out long amountInFilled, out long amountOutFilled, out int orderFilledCount)
+        bool fillByAmountIn, Dictionary<Address, long> userBalanceUsedMap, out long amountInFilled, out long amountOutFilled, out int orderFilledCount)
     {
         amountInFilled = 0;
         amountOutFilled = 0;
@@ -235,7 +261,7 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         while (amountInFilled < maxAmountInFilled && amountOutFilled < maxAmountOutFilled && orderFilledCount < maxFillOrderCount)
         {
             TryFillOrderBook(orderBook, maxAmountInFilled - amountInFilled, maxAmountOutFilled - amountOutFilled, maxFillOrderCount - orderFilledCount,
-                fillByAmountIn, out var amountInFilledThisBook, out var amountOutFilledThisBook, out var orderFilledCountThisBook);
+                fillByAmountIn, userBalanceUsedMap, out var amountInFilledThisBook, out var amountOutFilledThisBook, out var orderFilledCountThisBook);
             amountInFilled += amountInFilledThisBook;
             amountOutFilled += amountOutFilledThisBook;
             orderFilledCount += orderFilledCountThisBook;
@@ -325,6 +351,7 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
             {
                 orderNeedRemoveCount++;
                 State.OrderIdToOrderBookIdMap.Remove(userLimitOrder.OrderId);
+                State.UserLimitOrderIdsMap[userLimitOrder.Maker]?.LimitOrderIds.Remove(userLimitOrder.OrderId);
             }
 
             if (amountInFilled >= maxAmountInFilled || amountOutFilled >= maxAmountOutFilled || orderFilledCount >= maxFillOrderCount)
@@ -344,7 +371,7 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
     }
     
     private void TryFillOrderBook(OrderBook orderBook, long maxAmountInFilled, long maxAmountOutFilled, int maxFillOrderCount, 
-        bool fillByAmountIn, out long amountInFilled, out long amountOutFilled, out int orderFilledCount)
+        bool fillByAmountIn, Dictionary<Address, long> userBalanceUsedMap, out long amountInFilled, out long amountOutFilled, out int orderFilledCount)
     {
         amountInFilled = 0;
         amountOutFilled = 0;
@@ -353,7 +380,7 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         {
             orderFilledCount++;
             var checkoutResult = CheckAllowanceAndBalance(userLimitOrder.Maker, orderBook.SymbolIn, 
-                userLimitOrder.AmountIn - userLimitOrder.AmountInFilled, out var reasonType);
+                userLimitOrder.AmountIn - userLimitOrder.AmountInFilled, out var reasonType, userBalanceUsedMap);
             if (!checkoutResult || userLimitOrder.Deadline < Context.CurrentBlockTime)
             {
                 continue;
@@ -398,6 +425,8 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
             
             amountInFilled += amountIn;
             amountOutFilled += amountOut;
+            var userBalanceUsed = userBalanceUsedMap.GetValueOrDefault(userLimitOrder.Maker, 0);
+            userBalanceUsedMap[userLimitOrder.Maker] = userBalanceUsed + amountIn;
             if (amountInFilled >= maxAmountInFilled || amountOutFilled >= maxAmountOutFilled || orderFilledCount >= maxFillOrderCount)
             {
                 break;
