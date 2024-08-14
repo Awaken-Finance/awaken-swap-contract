@@ -29,13 +29,23 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         Assert(allReverseOutput.Reverses.Count > 0, "Trade pair not exist.");
         if (State.CheckCommitPriceEnabled.Value)
         {
+            var maxKValue = new BigIntValue(0);
+            var reserveA = 0L;
+            var reserveB = 0L;
             foreach (var reverse in allReverseOutput.Reverses)
             {
-                // reverseB/reverseA * 1.005 < amountOut / amountIn
-                var left = new BigIntValue(reverse.ReverseB).Mul(input.AmountIn).Mul(IncreaseRateMax + State.CommitPriceIncreaseRate.Value);
-                var right = new BigIntValue(input.AmountOut).Mul(reverse.ReverseA).Mul(IncreaseRateMax);
-                Assert(left <= right, "Invalid sell price.");
+                var kValue = new BigIntValue(reverse.ReverseA).Mul(reverse.ReverseB);
+                if (kValue > maxKValue)
+                {
+                    maxKValue = kValue;
+                    reserveA = reverse.ReverseA;
+                    reserveB = reverse.ReverseB;
+                }
             }
+            // reverseB/reverseA * 1.005 < amountOut / amountIn
+            var left = new BigIntValue(reserveB).Mul(input.AmountIn).Mul(IncreaseRateMax + State.CommitPriceIncreaseRate.Value);
+            var right = new BigIntValue(input.AmountOut).Mul(reserveA).Mul(IncreaseRateMax);
+            Assert(left <= right, "Invalid sell price.");
         }
 
         var headOrderBookId = State.OrderBookIdMap[input.SymbolIn][input.SymbolOut][price];
@@ -211,6 +221,15 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
                 Prices = { priceBook.PriceList.Prices.Skip(removePricesCount) }
             };
         }
+        Context.Fire(new LimitOrderTotalFilled
+        {
+            SymbolIn = input.SymbolIn,
+            SymbolOut = input.SymbolOut,
+            AmountInFilled = amountInUsed,
+            AmountOutFilled = amountOutUsed,
+            Sender = Context.Sender,
+            To = input.To
+        });
         return new Empty();
     }
     
@@ -345,7 +364,9 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
                 AmountInFilled = amountIn,
                 AmountOutFilled = amountOut,
                 FillTime = Context.CurrentBlockTime,
-                Taker = to
+                Taker = to,
+                SymbolIn = orderBook.SymbolIn,
+                SymbolOut = orderBook.SymbolOut
             });
             if (userLimitOrder.AmountInFilled == userLimitOrder.AmountIn || userLimitOrder.AmountOutFilled == userLimitOrder.AmountOut)
             {

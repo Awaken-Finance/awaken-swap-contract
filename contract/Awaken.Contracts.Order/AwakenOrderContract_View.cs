@@ -7,55 +7,6 @@ namespace Awaken.Contracts.Order;
 
 public partial class AwakenOrderContract
 {
-
-    // public override GetFillLimitOrderOutput GetFillLimitOrder(GetFillLimitOrderInput input)
-    // {
-    //     var result = new GetFillLimitOrderOutput();
-    //     var orderBookConfig = State.OrderBookConfig.Value;
-    //     var headerPriceBookId = State.HeaderPriceBookIdMap[input.SymbolOut][input.SymbolIn];
-    //     var headerPriceBook = State.PriceBookMap[headerPriceBookId];
-    //     if (headerPriceBookId <= 0 || headerPriceBook == null)
-    //     {
-    //         return result;
-    //     }
-    //
-    //     CalculatePrice(input.SymbolOut, input.SymbolIn, input.AmountIn, 
-    //         input.AmountIn, false, out var buyPrice);
-    //     var orderCount = 0;
-    //     var amountInUsed = 0L;
-    //     var priceBook = headerPriceBook;
-    //     
-    //     while (amountInUsed < input.AmountIn)
-    //     {
-    //         foreach (var sellPrice in priceBook.PriceList.Prices)
-    //         {
-    //             if (buyPrice < sellPrice)
-    //             {
-    //                 return result;
-    //             }
-    //             var headerOrderBookId = State.OrderBookIdMap[input.SymbolOut][input.SymbolIn][sellPrice];
-    //             var headerOrderBook = State.OrderBookMap[headerOrderBookId];
-    //             TryFillOrderBookList(headerOrderBook, result.FillOrders,input.AmountIn - amountInUsed, 
-    //                 orderBookConfig.MaxFillOrderCount - orderCount,  out var amountInFilled, out var orderFilledCount);
-    //             amountInUsed += amountInFilled;
-    //             orderCount += orderFilledCount;
-    //
-    //             if (amountInUsed >= input.AmountIn || orderCount >= orderBookConfig.MaxFillOrderCount)
-    //             {
-    //                 return result;
-    //             }
-    //         }
-    //         
-    //         if (priceBook.NextPagePriceBookId > 0)
-    //         {
-    //             priceBook = State.PriceBookMap[priceBook.NextPagePriceBookId];
-    //             continue;
-    //         }
-    //         return result;
-    //     }
-    //     return result;
-    // }
-
     public override Int64Value CalculatePrice(CalculatePriceInput input)
     {
         CalculatePrice(input.SymbolIn, input.SymbolOut, input.AmountIn, input.AmountOut, false, out var price, out var realAmountOut);
@@ -193,6 +144,15 @@ public partial class AwakenOrderContract
         return new Int64Value
         {
             Value = State.OrderIdToOrderBookIdMap[input.Value]
+        };
+    }
+
+    public override GetCommitPriceConfigOutput GetCommitPriceConfig(Empty input)
+    {
+        return new GetCommitPriceConfigOutput
+        {
+            CheckCommitPriceEnabled = State.CheckCommitPriceEnabled.Value,
+            CommitPriceIncreaseRate = State.CommitPriceIncreaseRate.Value
         };
     }
 }

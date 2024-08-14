@@ -136,7 +136,7 @@ public partial class AwakenHooksContract
         }
 
         var remainOrderMatched = false;
-        var minPoolAmountIn = amountIn / 10;
+        var minPoolAmountIn = Math.Max(amountIn / 10, 1);
         while (amountInPoolFilled + amountInOrderFilled < amountIn)
         {
             minPoolAmountIn = Math.Min(minPoolAmountIn, amountIn - amountInPoolFilled - amountInOrderFilled);
@@ -360,7 +360,7 @@ public partial class AwakenHooksContract
         }
         
         var remainOrderMatched = false;
-        var minPoolAmountOut = amountOut / 10;
+        var minPoolAmountOut = Math.Max(amountOut / 10, 1);
         while (amountOutPoolFilled + amountOutOrderFilled < amountOut)
         {
             minPoolAmountOut = Math.Min(minPoolAmountOut, amountOut - amountOutPoolFilled - amountOutOrderFilled);

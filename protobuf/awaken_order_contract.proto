@@ -242,6 +242,18 @@ message LimitOrderFilled {
   int64 amount_out_filled = 4;
   aelf.Address taker = 5;
   int64 total_fee = 6;
+  string symbol_in = 7;
+  string symbol_out = 8;
+}
+
+message LimitOrderTotalFilled {
+  option (aelf.is_event) = true;
+  string symbol_in = 1;
+  string symbol_out = 2;
+  int64 amount_in_filled = 3;
+  int64 amount_out_filled = 4;
+  aelf.Address sender = 5;
+  aelf.Address to = 6;
 }
 
 message LimitOrderCancelled {
