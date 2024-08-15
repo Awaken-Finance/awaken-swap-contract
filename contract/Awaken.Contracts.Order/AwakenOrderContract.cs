@@ -332,6 +332,10 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
                         throw new AssertionException($"Failed to parse {amountOutStr}");
                     }
                     amountOut = Math.Min(amountOut, userLimitOrder.AmountOut - userLimitOrder.AmountOutFilled);
+                    if (amountOut <= 0)
+                    {
+                        break;
+                    }
                 }
             }
             else
@@ -349,6 +353,10 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
                         throw new AssertionException($"Failed to parse {amountInStr}");
                     }
                     amountIn = Math.Min(amountIn, userLimitOrder.AmountIn - userLimitOrder.AmountInFilled);
+                    if (amountIn <= 0)
+                    {
+                        break;
+                    }
                 }
             }
             amountInFilled += amountIn;
@@ -424,6 +432,10 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
                         throw new AssertionException($"Failed to parse {amountOutStr}");
                     }
                     amountOut = Math.Min(amountOut, userLimitOrder.AmountOut - userLimitOrder.AmountOutFilled);
+                    if (amountOut <= 0)
+                    {
+                        break;
+                    }
                 }
             }
             else
@@ -441,6 +453,10 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
                         throw new AssertionException($"Failed to parse {amountInStr}");
                     }
                     amountIn = Math.Min(amountIn, userLimitOrder.AmountIn - userLimitOrder.AmountInFilled);
+                    if (amountIn <= 0)
+                    {
+                        break;
+                    }
                 }
             }
             
@@ -457,35 +473,27 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
 
     private void SwapInternal(Address maker, Address taker, string symbolIn, string symbolOut, long amountIn, long amountOut)
     {
-        State.TokenContract.TransferFrom.Send(new TransferFromInput
+        if (maker != taker)
         {
-            From = maker,
-            To = Context.Self,
-            Symbol = symbolIn,
-            Amount = amountIn,
-            Memo = "Fill Limit Order"
-        });
-        State.TokenContract.Transfer.Send(new TransferInput
+            State.TokenContract.TransferFrom.Send(new TransferFromInput
+            {
+                From = maker,
+                To = taker,
+                Symbol = symbolIn,
+                Amount = amountIn,
+                Memo = "Fill Limit Order"
+            });
+        }
+        if (Context.Sender != maker)
         {
-            To = taker,
-            Amount = amountIn,
-            Symbol = symbolIn,
-            Memo = "Fill Limit Order"
-        });
-        State.TokenContract.TransferFrom.Send(new TransferFromInput
-        {
-            From = Context.Sender,
-            To = Context.Self,
-            Symbol = symbolOut,
-            Amount = amountOut,
-            Memo = "Fill Limit Order"
-        });
-        State.TokenContract.Transfer.Send(new TransferInput
-        {
-            To = maker,
-            Amount = amountOut,
-            Symbol = symbolOut,
-            Memo = "Fill Limit Order"
-        });
+            State.TokenContract.TransferFrom.Send(new TransferFromInput
+            {
+                From = Context.Sender,
+                To = maker,
+                Symbol = symbolOut,
+                Amount = amountOut,
+                Memo = "Fill Limit Order"
+            });
+        }
     }
 }
