@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <TargetFramework>net6.0</TargetFramework>
-        <RootNamespace>Awaken.Contracts.Swap</RootNamespace>
+        <RootNamespace>Awaken.Contracts.Hooks</RootNamespace>
         <IsPackable>false</IsPackable>
     </PropertyGroup>
 
@@ -70,14 +70,15 @@
         <ContractStub Include="..\..\protobuf\parliament_contract_impl.proto">
             <Link>Protobuf\Proto\parliament_contract_impl.proto</Link>
         </ContractStub>
+        <ContractStub Include="..\..\protobuf\awaken_hooks_contract.proto">
+            <Link>Protobuf\Proto\awaken_hooks_contract.proto</Link>
+        </ContractStub>
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\contract\Awaken.Contracts.Hooks\Awaken.Contracts.Hooks.csproj" />
         <ProjectReference Include="..\..\contract\Awaken.Contracts.Swap\Awaken.Contracts.Swap.csproj" />
         <ProjectReference Include="..\..\contract\Awaken.Contracts.Token\Awaken.Contracts.Token.csproj" />
         <ProjectReference Include="..\..\src\AElf.Boilerplate.TestBase\AElf.Boilerplate.TestBase.csproj" />
     </ItemGroup>
-
-   
-
 </Project>

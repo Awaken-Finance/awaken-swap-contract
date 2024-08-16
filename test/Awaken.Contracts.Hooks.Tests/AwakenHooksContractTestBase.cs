@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using AElf.Cryptography.ECDSA;
@@ -17,6 +16,7 @@ using AElf.Kernel.Blockchain.Application;
 using AElf.Kernel.Token;
 using AElf.Standards.ACS0;
 using AElf.Standards.ACS3;
+using Awaken.Contracts.Swap;
 using Awaken.Contracts.Token;
 using Google.Protobuf.WellKnownTypes;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,21 +24,21 @@ using Volo.Abp.Threading;
 using CreateInput = AElf.Contracts.MultiToken.CreateInput;
 using ExternalInfo = AElf.Contracts.MultiToken.ExternalInfo;
 using IssueInput = AElf.Contracts.MultiToken.IssueInput;
+using TokenContract = Awaken.Contracts.Token.TokenContract;
 
-namespace Awaken.Contracts.Swap
+namespace Awaken.Contracts.Hooks
 {
-    public class AwakenSwapContractTestBase : ContractTestBase<AwakenSwapContractTestModule>
+    public class AwakenHooksContractTestBase : ContractTestBase<AwakenHooksContractTestModule>
     {
+        internal readonly Address AwakenHooksContractAddress;
+        
         internal readonly Address AwakenSwapContractAddress;
 
-        internal readonly Address LpTokentContractAddress;
+        internal readonly Address LpTokenContractAddress;
 
         internal readonly IBlockchainService blockChainService;
         internal ACS0Container.ACS0Stub ZeroContractStub { get; set; }
-
-        internal ParliamentContractImplContainer.ParliamentContractImplStub ParliamentContractStub =>
-            GetParliamentContractTester(SampleAccount.Accounts.First().KeyPair);
-
+        
         protected Address DefaultAddress => Accounts[0].Address;
 
         protected int SeedNum = 0;
@@ -82,13 +82,21 @@ namespace Awaken.Contracts.Swap
             ECKeyPair senderKeyPair)
         {
             return Application.ServiceProvider.GetRequiredService<IContractTesterFactory>()
-                .Create<Awaken.Contracts.Token.TokenContractContainer.TokenContractStub>(LpTokentContractAddress,
+                .Create<Awaken.Contracts.Token.TokenContractContainer.TokenContractStub>(LpTokenContractAddress,
+                    senderKeyPair);
+        }
+        
+        internal AwakenHooksContractContainer.AwakenHooksContractStub GetHooksContractStub(
+            ECKeyPair senderKeyPair)
+        {
+            return Application.ServiceProvider.GetRequiredService<IContractTesterFactory>()
+                .Create<AwakenHooksContractContainer.AwakenHooksContractStub>(AwakenHooksContractAddress,
                     senderKeyPair);
         }
 
         // You can get address of any contract via GetAddress method, for example:
         // internal Address DAppContractAddress => GetAddress(DAppSmartContractAddressNameProvider.StringName);
-        public AwakenSwapContractTestBase()
+        public AwakenHooksContractTestBase()
         {
             ZeroContractStub = GetContractZeroTester(SampleAccount.Accounts[0].KeyPair);
             var result = AsyncHelper.RunSync(async () => await ZeroContractStub.DeploySmartContract.SendAsync(
@@ -99,43 +107,27 @@ namespace Awaken.Contracts.Swap
                         File.ReadAllBytes(typeof(AwakenSwapContract).Assembly.Location))
                 }));
             AwakenSwapContractAddress = Address.Parser.ParseFrom(result.TransactionResult.ReturnValue);
+
             result = AsyncHelper.RunSync(async () => await ZeroContractStub.DeploySmartContract.SendAsync(
                 new ContractDeploymentInput
                 {
                     Category = KernelConstants.CodeCoverageRunnerCategory,
                     Code = ByteString.CopyFrom(
-                        File.ReadAllBytes(typeof(Token.TokenContract).Assembly.Location))
+                        File.ReadAllBytes(typeof(TokenContract).Assembly.Location))
                 }));
-            LpTokentContractAddress = Address.Parser.ParseFrom(result.TransactionResult.ReturnValue);
+            LpTokenContractAddress = Address.Parser.ParseFrom(result.TransactionResult.ReturnValue);
+            result = AsyncHelper.RunSync(async () => await ZeroContractStub.DeploySmartContract.SendAsync(
+                new ContractDeploymentInput
+                {
+                    Category = KernelConstants.CodeCoverageRunnerCategory,
+                    Code = ByteString.CopyFrom(
+                        File.ReadAllBytes(typeof(AwakenHooksContract).Assembly.Location))
+                }));
+            AwakenHooksContractAddress = Address.Parser.ParseFrom(result.TransactionResult.ReturnValue);
+            
             blockChainService = Application.ServiceProvider.GetRequiredService<IBlockchainService>();
-
-            // AsyncHelper.RunSync(() => SubmitAndApproveProposalOfDefaultParliament(TokenContractAddress,
-            //     nameof(TokenContractStub.Create), new CreateInput()
-            //     {
-            //         Symbol = "ELF",
-            //         Decimals = 8,
-            //         IsBurnable = true,
-            //         TokenName = "ELF2",
-            //         TotalSupply = 100_000_000_000_000_000L,
-            //         Issuer = DefaultAddress,
-            //         ExternalInfo = new ExternalInfo(),
-            //         Owner = DefaultAddress
-            //     }));
-
+            
             AsyncHelper.RunSync(() => CreateSeedNftCollection(TokenContractImplStub));
-        }
-
-        private async Task<Address> DeployContractAsync(int category, byte[] code, ECKeyPair keyPair)
-        {
-            var addressService = Application.ServiceProvider.GetRequiredService<ISmartContractAddressService>();
-            var stub = GetTester<ACS0Container.ACS0Stub>(addressService.GetZeroSmartContractAddress(),
-                keyPair);
-            var executionResult = await stub.DeploySmartContract.SendAsync(new ContractDeploymentInput
-            {
-                Category = category,
-                Code = ByteString.CopyFrom(code)
-            });
-            return executionResult.Output;
         }
 
         private ECKeyPair AdminKeyPair { get; set; } = SampleAccount.Accounts[0].KeyPair;
@@ -146,9 +138,6 @@ namespace Awaken.Contracts.Swap
         internal Address UserLilyAddress => Address.FromPublicKey(UserLilyKeyPair.PublicKey);
 
         internal Address AdminAddress => Address.FromPublicKey(AdminKeyPair.PublicKey);
-
-        protected List<ECKeyPair> InitialCoreDataCenterKeyPairs =>
-            Accounts.Take(InitialCoreDataCenterCount).Select(a => a.KeyPair).ToList();
 
         internal AwakenSwapContractContainer.AwakenSwapContractStub UserTomStub =>
             GetAwakenSwapContractStub(UserTomKeyPair);
@@ -167,6 +156,15 @@ namespace Awaken.Contracts.Swap
 
         internal Awaken.Contracts.Token.TokenContractContainer.TokenContractStub TomLpStub =>
             GetLpContractStub(UserTomKeyPair);
+
+        internal Hooks.AwakenHooksContractContainer.AwakenHooksContractStub AdminHooksStud =>
+            GetHooksContractStub(AdminKeyPair);
+        
+        internal Hooks.AwakenHooksContractContainer.AwakenHooksContractStub TomHooksStud =>
+            GetHooksContractStub(UserTomKeyPair);
+        
+        internal Hooks.AwakenHooksContractContainer.AwakenHooksContractStub LilyHooksStud =>
+            GetHooksContractStub(UserLilyKeyPair);
 
         private Address GetAddress(string contractName)
         {
@@ -193,41 +191,6 @@ namespace Awaken.Contracts.Swap
         {
             return GetTester<ParliamentContractImplContainer.ParliamentContractImplStub>(ParliamentContractAddress,
                 keyPair);
-        }
-
-        private async Task SubmitAndApproveProposalOfDefaultParliament(Address contractAddress, string methodName,
-            IMessage message)
-        {
-            var defaultParliamentAddress =
-                await ParliamentContractStub.GetDefaultOrganizationAddress.CallAsync(new Empty());
-            var proposalId = await CreateProposalAsync(TokenContractAddress,
-                defaultParliamentAddress, methodName, message);
-            await ApproveWithMinersAsync(proposalId);
-            var releaseResult = await ParliamentContractStub.Release.SendAsync(proposalId);
-        }
-
-        private async Task<Hash> CreateProposalAsync(Address contractAddress, Address organizationAddress,
-            string methodName, IMessage input)
-        {
-            var proposal = new CreateProposalInput
-            {
-                OrganizationAddress = organizationAddress,
-                ContractMethodName = methodName,
-                ExpiredTime = TimestampHelper.GetUtcNow().AddHours(1),
-                Params = input.ToByteString(),
-                ToAddress = contractAddress
-            };
-
-            var createResult = await ParliamentContractStub.CreateProposal.SendAsync(proposal);
-            var proposalId = createResult.Output;
-
-            return proposalId;
-        }
-
-        private async Task ApproveWithMinersAsync(Hash proposalId)
-        {
-            var tester = GetParliamentContractTester(AdminKeyPair);
-            var approveResult = await tester.Approve.SendAsync(proposalId);
         }
 
         internal async Task CreateSeedNftCollection(TokenContractImplContainer.TokenContractImplStub stub)
