@@ -169,6 +169,11 @@ public partial class AwakenOrderContract
         }).Decimals;
     }
     
+    /*
+     * price = 10^8 * (amountOut / 10^decimalOut ) / (amountIn/10^decimalIn)
+     * equivalent to
+     * price = 10^(8+decimalIn-decimalOut) * amountOut / amountIn
+     */
     private void CalculatePrice(string symbolIn, string symbolOut, long amountIn, long amountOut, bool erasePlaceDecimal, out long price, out long realAmountOut)
     {
         var symbolInDecimal = GetTokenDecimal(symbolIn);
