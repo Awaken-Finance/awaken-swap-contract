@@ -1,8 +1,7 @@
-using System.Linq;
-using AElf;
+using System.Collections.Generic;
 using AElf.Contracts.MultiToken;
 using AElf.Sdk.CSharp;
-using AElf.Types;
+using Awaken.Contracts.Order;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using TransferFromInput = Awaken.Contracts.Token.TransferFromInput;
@@ -28,48 +27,25 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
         return new Empty();
     }
 
-    public override Empty SetAdmin(Address input)
-    {
-        Assert(!input.Value.IsNullOrEmpty(), "Invalid input.");
-        CheckAdminPermission();
-        State.Admin.Value = input;
-        return new Empty();
-    }
-
-    public override Empty AddSwapContractInfo(AddSwapContractInfoInput input)
-    {
-        CheckAdminPermission();
-        Assert(input.SwapContractList != null && input.SwapContractList.SwapContracts.Count > 0, "Invalid input.");
-        FillSwapContractInfoList(input.SwapContractList);
-        return new Empty();
-    }
-
-    public override Empty RemoveSwapContractInfo(RemoveSwapContractInfoInput input)
-    {
-        CheckAdminPermission();
-        Assert(input.FeeRates.Count > 0, "Invalid input.");
-        var swapContractInfoList = State.SwapContractInfoList.Value ??= new SwapContractInfoList();
-        foreach (var feeRate in input.FeeRates)
-        {
-            var swapContractInfo = swapContractInfoList.SwapContracts.FirstOrDefault(t => t.FeeRate == feeRate);
-            if (swapContractInfo != null)
-            {
-                swapContractInfoList.SwapContracts.Remove(swapContractInfo);
-            }
-        }
-        State.SwapContractInfoList.Value = swapContractInfoList;
-        return new Empty();
-    }
-
     public override Empty SwapExactTokensForTokens(SwapExactTokensForTokensInput input)
     {
         Assert(input.SwapTokens.Count > 0, "Invalid input.");
+        var limitOrderFillDetailMap = new Dictionary<string, FillDetail>();
+        var maxFillCount = State.MaxFillLimitOrderCount.Value;
         foreach (var swapInput in input.SwapTokens)
         {
             var amounts = GetAmountsOut(swapInput.AmountIn, swapInput.Path, swapInput.FeeRates);
             Assert(amounts[amounts.Count - 1] >= swapInput.AmountOutMin, "Insufficient Output amount");
+            
+            if (maxFillCount > 0 && State.MatchLimitOrderEnabled.Value &&
+                (swapInput.FeeRates.Count == 1 || State.MultiSwapMatchLimitOrderEnabled.Value))
+            {
+                MixSwapExactTokensForTokensAndLimitOrder(swapInput, amounts, limitOrderFillDetailMap, maxFillCount, out var orderFilledCount);
+                maxFillCount -= orderFilledCount;
+                continue;
+            }
+            
             TransferFromSender(swapInput.Path[0], swapInput.AmountIn, "Hooks Swap");
-
             var beginIndex = 0;
             for (var pathCount = 0; pathCount < swapInput.FeeRates.Count; pathCount++)
             {
@@ -108,10 +84,21 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
     public override Empty SwapTokensForExactTokens(SwapTokensForExactTokensInput input)
     {
         Assert(input.SwapTokens.Count > 0, "Invalid input.");
+        var limitOrderFillDetailMap = new Dictionary<string, FillDetail>();
+        var maxFillCount = State.MaxFillLimitOrderCount.Value;
         foreach (var swapInput in input.SwapTokens)
         {
             var amounts = GetAmountsIn(swapInput.AmountOut, swapInput.Path, swapInput.FeeRates);
             Assert(amounts[0] <= swapInput.AmountInMax, "Excessive Input amount");
+
+            if (maxFillCount > 0 && State.MatchLimitOrderEnabled.Value &&
+                (swapInput.FeeRates.Count == 1 || State.MultiSwapMatchLimitOrderEnabled.Value))
+            {
+                MixSwapTokensForExactTokensAndLimitOrder(swapInput, amounts, limitOrderFillDetailMap, maxFillCount, out int orderFilledCount);
+                maxFillCount -= orderFilledCount;
+                continue;
+            }
+
             TransferFromSender(swapInput.Path[0], amounts[0], "Hooks Swap");
             var beginIndex = 0;
             for (var pathCount = 0; pathCount < swapInput.FeeRates.Count; pathCount++)
@@ -145,7 +132,7 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
         FireHooksTransactionCreatedLogEvent(nameof(SwapTokensForExactTokens), input.ToByteString());
         return new Empty();
     }
-    
+
     public override Empty CreatePair(CreatePairInput input)
     {
         var swapContract = GetSwapContractInfo(input.FeeRate);

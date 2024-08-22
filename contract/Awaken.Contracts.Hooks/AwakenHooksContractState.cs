@@ -10,4 +10,7 @@ public partial class AwakenHooksContractState : ContractState
     public SingletonState<SwapContractInfoList> SwapContractInfoList { get; set; }
 
     public SingletonState<Address> Admin { get; set; }
+    public SingletonState<bool> MatchLimitOrderEnabled { get; set; }
+    public SingletonState<bool> MultiSwapMatchLimitOrderEnabled { get; set; }
+    public SingletonState<int> MaxFillLimitOrderCount { get; set; }
 }

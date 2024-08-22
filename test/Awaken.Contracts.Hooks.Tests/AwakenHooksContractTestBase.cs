@@ -16,6 +16,7 @@ using AElf.Kernel.Blockchain.Application;
 using AElf.Kernel.Token;
 using AElf.Standards.ACS0;
 using AElf.Standards.ACS3;
+using Awaken.Contracts.Order;
 using Awaken.Contracts.Swap;
 using Awaken.Contracts.Token;
 using Google.Protobuf.WellKnownTypes;
@@ -35,6 +36,8 @@ namespace Awaken.Contracts.Hooks
         internal readonly Address AwakenSwapContractAddress;
 
         internal readonly Address LpTokenContractAddress;
+        
+        internal readonly Address OrderContractAddress;
 
         internal readonly IBlockchainService blockChainService;
         internal ACS0Container.ACS0Stub ZeroContractStub { get; set; }
@@ -93,6 +96,14 @@ namespace Awaken.Contracts.Hooks
                 .Create<AwakenHooksContractContainer.AwakenHooksContractStub>(AwakenHooksContractAddress,
                     senderKeyPair);
         }
+        
+        internal AwakenOrderContractContainer.AwakenOrderContractStub GetOrderContractStub(
+            ECKeyPair senderKeyPair)
+        {
+            return Application.ServiceProvider.GetRequiredService<IContractTesterFactory>()
+                .Create<AwakenOrderContractContainer.AwakenOrderContractStub>(OrderContractAddress,
+                    senderKeyPair);
+        }
 
         // You can get address of any contract via GetAddress method, for example:
         // internal Address DAppContractAddress => GetAddress(DAppSmartContractAddressNameProvider.StringName);
@@ -124,6 +135,15 @@ namespace Awaken.Contracts.Hooks
                         File.ReadAllBytes(typeof(AwakenHooksContract).Assembly.Location))
                 }));
             AwakenHooksContractAddress = Address.Parser.ParseFrom(result.TransactionResult.ReturnValue);
+            
+            result = AsyncHelper.RunSync(async () => await ZeroContractStub.DeploySmartContract.SendAsync(
+                new ContractDeploymentInput
+                {
+                    Category = KernelConstants.CodeCoverageRunnerCategory,
+                    Code = ByteString.CopyFrom(
+                        File.ReadAllBytes(typeof(AwakenOrderContract).Assembly.Location))
+                }));
+            OrderContractAddress = Address.Parser.ParseFrom(result.TransactionResult.ReturnValue);
             
             blockChainService = Application.ServiceProvider.GetRequiredService<IBlockchainService>();
             
@@ -165,6 +185,15 @@ namespace Awaken.Contracts.Hooks
         
         internal Hooks.AwakenHooksContractContainer.AwakenHooksContractStub LilyHooksStud =>
             GetHooksContractStub(UserLilyKeyPair);
+        
+        internal AwakenOrderContractContainer.AwakenOrderContractStub AdminOrderStud =>
+            GetOrderContractStub(AdminKeyPair);
+        
+        internal AwakenOrderContractContainer.AwakenOrderContractStub TomOrderStud =>
+            GetOrderContractStub(UserTomKeyPair);
+        
+        internal AwakenOrderContractContainer.AwakenOrderContractStub LilyOrderStud =>
+            GetOrderContractStub(UserLilyKeyPair);
 
         private Address GetAddress(string contractName)
         {

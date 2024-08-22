@@ -31,6 +31,10 @@ service AwakenHooksContract {
   }
   rpc RemoveSwapContractInfo (RemoveSwapContractInfoInput) returns (google.protobuf.Empty) {
   }
+  rpc SetLimitOrderConfig(SetLimitOrderConfigInput) returns (google.protobuf.Empty) {
+  }
+  rpc SetOrderContract(aelf.Address) returns (google.protobuf.Empty) {
+  }
   
   // View
   rpc GetSwapContractList (google.protobuf.Empty) returns (GetSwapContractListOutput) {
@@ -44,6 +48,14 @@ service AwakenHooksContract {
   }
   rpc GetAmountsIn (GetAmountsInInput) returns (GetAmountsInOutput) {
     option (aelf.is_view) = true;
+  }
+  rpc GetAllReverse (GetAllReverseInput) returns (GetAllReverseOutput) {
+    option (aelf.is_view) = true;
+  }
+  rpc GetLimitOrderConfig(google.protobuf.Empty) returns (GetLimitOrderConfigOutput) {
+    option (aelf.is_view) = true;
+  }
+  rpc GetOrderContract(google.protobuf.Empty) returns (aelf.Address) {
   }
 }
 
@@ -59,6 +71,18 @@ message AddSwapContractInfoInput {
 
 message RemoveSwapContractInfoInput {
   repeated int64 fee_rates = 1;
+}
+
+message SetLimitOrderConfigInput {
+  bool match_limit_order_enabled = 1;
+  bool multi_swap_match_limit_order_enabled = 2;
+  int32 max_fill_limit_order_count = 3;
+}
+
+message GetLimitOrderConfigOutput {
+  bool match_limit_order_enabled = 1;
+  bool multi_swap_match_limit_order_enabled = 2;
+  int32 max_fill_limit_order_count = 3;
 }
 
 message SwapContractInfo {
@@ -132,6 +156,11 @@ message SwapTokensForExactTokens {
   repeated int64 fee_rates = 7;
 }
 
+message GetAllReverseInput {
+  string symbol_a = 1;
+  string symbol_b = 2;
+}
+
 // Outputs
 message AddLiquidityOutput {
   string symbol_a = 1;
@@ -166,6 +195,18 @@ message GetAmountsOutOutput{
 
 message GetAmountsInOutput{
   repeated int64 amount = 1;
+}
+
+message GetAllReverseOutput {
+  repeated Reverse reverses = 1;
+}
+
+message Reverse {
+  int64 fee_rate = 1;
+  string symbol_a = 2;
+  string symbol_b = 3;
+  int64 reverse_a = 4;
+  int64 reverse_b = 5;
 }
 
 //event

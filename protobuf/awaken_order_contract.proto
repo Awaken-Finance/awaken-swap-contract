@@ -1,0 +1,276 @@
+syntax = "proto3";
+
+import "aelf/core.proto";
+import "aelf/options.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/timestamp.proto";
+import "acs12.proto";
+
+option csharp_namespace = "Awaken.Contracts.Order";
+
+service AwakenOrderContract {
+  option (aelf.csharp_state) = "Awaken.Contracts.Order.AwakenOrderContractState";
+  option (aelf.base) = "acs12.proto";
+
+  rpc Initialize (InitializeInput) returns (google.protobuf.Empty) {
+  }
+  rpc SetAdmin (aelf.Address) returns (google.protobuf.Empty) {
+  }
+  rpc SetHooksContract (aelf.Address) returns (google.protobuf.Empty) {
+  }
+  rpc SetOrderBookConfig (SetOrderBookConfigInput) returns (google.protobuf.Empty) {
+  }
+  rpc SetCommitPriceConfig (SetCommitPriceConfigInput) returns (google.protobuf.Empty) {
+  }
+  rpc AddFillOrderWhiteList (aelf.Address) returns (google.protobuf.Empty) {
+  }
+  rpc RemoveFillOrderWhiteList (aelf.Address) returns (google.protobuf.Empty) {
+  }
+
+  rpc CommitLimitOrder (CommitLimitOrderInput) returns (google.protobuf.Empty) {
+  }
+  rpc CancelLimitOrder (CancelLimitOrderInput) returns (google.protobuf.Empty) {
+  }
+  rpc FillLimitOrder (FillLimitOrderInput) returns (google.protobuf.Empty) {
+  }
+  // view
+
+  rpc GetFillResult (GetFillResultInput) returns (GetFillResultOutput) {
+    option (aelf.is_view) = true;
+  }
+  
+  rpc GetBestSellPrice (GetBestSellPriceInput) returns (GetBestSellPriceOutput) {
+    option (aelf.is_view) = true;
+  }
+  
+  rpc GetAdmin (google.protobuf.Empty) returns (aelf.Address) {
+    option (aelf.is_view) = true;
+  }
+
+  rpc GetFillOrderWhiteList (google.protobuf.Empty) returns (WhiteList) {
+    option (aelf.is_view) = true;
+  }
+  
+  rpc GetHooksContract (google.protobuf.Empty) returns (aelf.Address) {
+    option (aelf.is_view) = true;
+  }
+  rpc GetOrderBookConfig (google.protobuf.Empty) returns (GetOrderBookConfigOutput) {
+    option (aelf.is_view) = true;
+  }
+
+  rpc GetCommitPriceConfig (google.protobuf.Empty) returns (GetCommitPriceConfigOutput) {
+    option (aelf.is_view) = true;
+  }
+  
+  rpc GetPriceBook (google.protobuf.Int64Value) returns (PriceBook) {
+    option (aelf.is_view) = true;
+  }
+
+  rpc GetOrderBook (google.protobuf.Int64Value) returns (OrderBook) {
+    option (aelf.is_view) = true;
+  }
+
+  rpc GetUserLimitOrder (google.protobuf.Int64Value) returns (UserLimitOrder) {
+    option (aelf.is_view) = true;
+  }
+
+  rpc GetOrderBookIdByOrderId (google.protobuf.Int64Value) returns (google.protobuf.Int64Value) {
+    option (aelf.is_view) = true;
+  }
+
+  rpc CalculatePrice (CalculatePriceInput) returns (google.protobuf.Int64Value) {
+    option (aelf.is_view) = true;
+  }
+}
+
+//Input 
+message InitializeInput {
+  aelf.Address hooks_contract_address = 1;
+  aelf.Address admin = 2;
+  bool check_commit_price_enabled = 3;
+  int32 commit_price_increase_rate = 4;
+}
+
+message SetOrderBookConfigInput {
+   OrderBookConfig order_book_config = 1;
+}
+
+message GetOrderBookConfigOutput {
+  OrderBookConfig order_book_config = 1;
+}
+
+message OrderBookConfig {
+  int32 max_orders_each_order_book = 1;
+  int32 max_prices_each_price_book = 2;
+  int32 max_fill_order_count = 3;
+  int64 price_multiple = 4;
+  int64 erase_price_multiple = 5;
+  int64 max_order_books_each_price = 6;
+  int64 max_price_books_each_trade_pair = 7;
+  int32 user_pending_orders_limit = 8;
+}
+
+message GetCommitPriceConfigOutput {
+  bool check_commit_price_enabled = 1;
+  int32 commit_price_increase_rate = 2;
+}
+
+message SetCommitPriceConfigInput {
+  bool check_commit_price_enabled = 1;
+  int32 commit_price_increase_rate = 2;
+}
+
+message WhiteList {
+  repeated aelf.Address value = 1;
+}
+
+message LimitOrderIdList {
+  repeated int64 limit_order_ids = 1;
+}
+
+message CommitLimitOrderInput {
+  int64 amount_in = 1;
+  string symbol_in = 2;
+  int64 amount_out = 3;
+  string symbol_out = 4;
+  google.protobuf.Timestamp deadline = 5;
+}
+
+message CancelLimitOrderInput {
+  int64 order_id = 1;
+}
+
+message FillLimitOrderInput {
+  int64 amount_in = 1;
+  string symbol_in = 2;
+  int64 max_close_interval_price = 3;
+  int64 amount_out = 4;
+  string symbol_out = 5;
+  aelf.Address to = 6;
+}
+
+message GetBestSellPriceInput {
+  string symbol_in = 1;
+  string symbol_out = 2;
+  int64 min_open_interval_price = 3;
+}
+
+message GetBestSellPriceOutput {
+  int64 price = 1;
+}
+
+message GetFillResultInput {
+  int64 amount_in = 1; // choose one set value from amount_in and amount_out
+  int64 amount_out = 2;
+  string symbol_in = 3;
+  string symbol_out = 4;
+  int64 min_close_interval_price = 5;
+  int64 max_open_interval_price = 6;
+  int32 max_fill_order_count = 7;
+}
+
+message GetFillResultOutput {
+  int64 amount_in_filled = 1;
+  int64 max_price_filled = 2;
+  int64 amount_out_filled = 3;
+  int32 order_filled_count = 4;
+  repeated FillDetail fill_details = 5;
+}
+
+message FillDetail {
+  int64 price = 1;
+  int64 amount_in = 2;
+  int64 amount_out = 3;
+  int32 order_filled_count = 4;
+}
+
+message CalculatePriceInput {
+  string symbol_in = 1;
+  string symbol_out = 2;
+  int64 amount_in = 3;
+  int64 amount_out = 4;
+}
+
+message OrderBook {
+  int64 next_page_order_book_id = 1;
+  repeated UserLimitOrder user_limit_orders = 2; // set maxSize
+  int64 order_book_id = 3;
+  string symbol_in = 4;
+  string symbol_out = 5;
+}
+
+message UserLimitOrder {
+  int64 amount_in = 1;
+  int64 amount_out = 2;
+  google.protobuf.Timestamp commit_time = 3;
+  google.protobuf.Timestamp deadline = 4;
+  google.protobuf.Timestamp fill_time = 5;
+  aelf.Address maker = 6;
+  int64 amount_in_filled = 7;
+  int64 order_id = 8;
+  int64 amount_out_filled = 9;
+}
+
+message PriceBook {
+  int64 next_page_price_book_id = 1;
+  PriceList priceList = 2;
+  int64 price_book_id = 3;
+}
+
+message PriceList {
+  repeated int64 prices = 1;
+}
+
+message LimitOrderCreated {
+  option (aelf.is_event) = true;
+  int64 amount_in = 1;
+  string symbol_in = 2;
+  int64 amount_out = 3;
+  string symbol_out = 4;
+  google.protobuf.Timestamp deadline = 5;
+  google.protobuf.Timestamp commit_time = 6;
+  int64 order_id = 7;
+  aelf.Address maker = 8;
+}
+
+message LimitOrderFilled {
+  option (aelf.is_event) = true;
+  int64 order_id = 1;
+  google.protobuf.Timestamp fill_time = 2;
+  int64 amount_in_filled = 3;
+  int64 amount_out_filled = 4;
+  aelf.Address taker = 5;
+  int64 total_fee = 6;
+  string symbol_in = 7;
+  string symbol_out = 8;
+}
+
+message LimitOrderTotalFilled {
+  option (aelf.is_event) = true;
+  string symbol_in = 1;
+  string symbol_out = 2;
+  int64 amount_in_filled = 3;
+  int64 amount_out_filled = 4;
+  aelf.Address sender = 5;
+  aelf.Address to = 6;
+}
+
+message LimitOrderCancelled {
+  option (aelf.is_event) = true;
+  int64 order_id = 1;
+  google.protobuf.Timestamp cancel_time = 2;
+}
+
+enum ReasonType {
+  Expired = 0;
+  Allowance_Not_Enough = 1;
+  Balance_Not_Enough = 2;
+}
+
+message LimitOrderRemoved {
+  option (aelf.is_event) = true;
+  int64 order_id = 1;
+  google.protobuf.Timestamp remove_time = 2;
+  ReasonType reason_type = 3;
+}

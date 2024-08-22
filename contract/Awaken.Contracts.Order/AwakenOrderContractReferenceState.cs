@@ -1,16 +1,16 @@
 using AElf.Standards.ACS0;
-using Awaken.Contracts.Order;
+using Awaken.Contracts.Hooks;
 
-namespace Awaken.Contracts.Hooks;
+namespace Awaken.Contracts.Order;
 
-public partial class AwakenHooksContractState
+public partial class AwakenOrderContractState
 {
     internal AElf.Contracts.MultiToken.TokenContractContainer.TokenContractReferenceState TokenContract
     {
         get;
         set;
     }
-    internal AwakenOrderContractContainer.AwakenOrderContractReferenceState OrderContract
+    internal AwakenHooksContractContainer.AwakenHooksContractReferenceState HooksContract
     {
         get;
         set;
