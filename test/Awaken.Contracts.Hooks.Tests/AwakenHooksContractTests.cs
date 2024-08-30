@@ -572,6 +572,70 @@ public partial class AwakenHooksContractTests : AwakenHooksContractTestBase
         balanceELFAfter.Balance.ShouldBe(balanceELFBefore.Balance + amountOuts1.Amount[1] - amountIn);
         balanceTESTAfter.Balance.ShouldBe(balanceTESTBefore.Balance - amountIn);
         balanceDAIAfter.Balance.ShouldBe(balanceDAIBefore.Balance + amountOuts2.Amount[1]);
+        
+        result = await TomHooksStud.SetLabsFeeRate.SendWithExceptionAsync(new Int64Value
+        {
+            Value = 50
+        });
+        result.TransactionResult.Error.ShouldContain("No permission.");
+        result = await TomHooksStud.SetLabsFeeTo.SendWithExceptionAsync(AdminAddress);
+        result.TransactionResult.Error.ShouldContain("No permission.");
+        await AdminHooksStud.SetLabsFeeRate.SendAsync(new Int64Value
+        {
+            Value = 50
+        });
+        await AdminHooksStud.SetLabsFeeTo.SendAsync(AdminAddress);
+        result = await TomHooksStud.SwapExactTokensForTokens.SendWithExceptionAsync(
+            new SwapExactTokensForTokensInput()
+            {
+                SwapTokens =
+                {
+                    new SwapExactTokensForTokens()
+                    {
+                        AmountIn = amountIn,
+                        AmountOutMin = 0,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF"},
+                        FeeRates = { _feeRate}
+                    },
+                },
+                LabsFeeRate = 100
+            });
+        result.TransactionResult.Error.ShouldContain("Invalid labsFeeRate");
+        var amountOut = (await TomHooksStud.GetAmountsOut.CallAsync(new GetAmountsOutInput
+        {
+            FeeRates = { _feeRate },
+            Path = { "TEST","ELF"},
+            AmountIn = amountIn
+        })).Amount[1];
+        result = await TomHooksStud.SwapExactTokensForTokens.SendAsync(
+            new SwapExactTokensForTokensInput()
+            {
+                SwapTokens =
+                {
+                    new SwapExactTokensForTokens()
+                    {
+                        AmountIn = amountIn,
+                        AmountOutMin = 0,
+                        Channel = "",
+                        Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+                        To = UserTomAddress,
+                        Path = { "TEST","ELF"},
+                        FeeRates = { _feeRate}
+                    },
+                },
+                LabsFeeRate = 50
+            });
+        
+        var labsFeeChargedLogEvent = result.TransactionResult.Logs.First(l => l.Name == nameof(LabsFeeCharged));
+        var labsFee = 50 * amountOut / 10000;
+        var labsFeeCharged = LabsFeeCharged.Parser.ParseFrom(labsFeeChargedLogEvent.NonIndexed);
+        labsFeeCharged.Symbol.ShouldContain("ELF");
+        labsFeeCharged.Amount.ShouldBe(labsFee);
+        labsFeeCharged.Address.ShouldBe(UserTomAddress);
+        labsFeeCharged.FeeTo.ShouldBe(AdminAddress);
     }
     
     [Fact]

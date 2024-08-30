@@ -35,6 +35,10 @@ service AwakenHooksContract {
   }
   rpc SetOrderContract(aelf.Address) returns (google.protobuf.Empty) {
   }
+  rpc SetLabsFeeRate (google.protobuf.Int64Value) returns (google.protobuf.Empty) {
+  }
+  rpc SetLabsFeeTo (aelf.Address) returns (google.protobuf.Empty) {
+  }
   
   // View
   rpc GetSwapContractList (google.protobuf.Empty) returns (GetSwapContractListOutput) {
@@ -56,6 +60,12 @@ service AwakenHooksContract {
     option (aelf.is_view) = true;
   }
   rpc GetOrderContract(google.protobuf.Empty) returns (aelf.Address) {
+  }
+  rpc GetLabsFeeTo (google.protobuf.Empty) returns (aelf.Address) {
+    option (aelf.is_view) = true;
+  }
+  rpc GetLabsFeeRate (google.protobuf.Empty) returns (google.protobuf.Int64Value) {
+    option (aelf.is_view) = true;
   }
 }
 
@@ -130,6 +140,7 @@ message RemoveLiquidityInput {
 
 message SwapExactTokensForTokensInput {
   repeated SwapExactTokensForTokens swap_tokens = 1;
+  int32 labs_fee_rate = 2;
 }
 
 message SwapExactTokensForTokens {
@@ -144,6 +155,7 @@ message SwapExactTokensForTokens {
 
 message SwapTokensForExactTokensInput {
   repeated SwapTokensForExactTokens swap_tokens = 1;
+  int32 labs_fee_rate = 2;
 }
 
 message SwapTokensForExactTokens {
@@ -215,5 +227,13 @@ message HooksTransactionCreated{
   aelf.Address sender = 1 [(aelf.is_indexed) = true];
   string method_name = 2 [(aelf.is_indexed) = true];
   bytes args = 3;
+}
+
+message LabsFeeCharged{
+  option (aelf.is_event) = true;
+  aelf.Address address = 1;
+  string symbol = 2;
+  int64 amount = 3;
+  aelf.Address feeTo = 4;
 }
 

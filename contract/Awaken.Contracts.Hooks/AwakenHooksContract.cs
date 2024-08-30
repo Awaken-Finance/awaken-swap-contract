@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using AElf.Contracts.MultiToken;
 using AElf.Sdk.CSharp;
+using AElf.Types;
 using Awaken.Contracts.Order;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
@@ -30,8 +31,10 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
     public override Empty SwapExactTokensForTokens(SwapExactTokensForTokensInput input)
     {
         Assert(input.SwapTokens.Count > 0, "Invalid input.");
+        Assert(input.LabsFeeRate >= 0 && input.LabsFeeRate <= State.LabsFeeRate.Value, "Invalid labsFeeRate.");
         var limitOrderFillDetailMap = new Dictionary<string, FillDetail>();
         var maxFillCount = State.MaxFillLimitOrderCount.Value;
+        var totalAmountOutMap = new Dictionary<Address, Dictionary<string, long>>();
         foreach (var swapInput in input.SwapTokens)
         {
             var amounts = GetAmountsOut(swapInput.AmountIn, swapInput.Path, swapInput.FeeRates);
@@ -40,8 +43,10 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
             if (maxFillCount > 0 && State.MatchLimitOrderEnabled.Value &&
                 (swapInput.FeeRates.Count == 1 || State.MultiSwapMatchLimitOrderEnabled.Value))
             {
-                MixSwapExactTokensForTokensAndLimitOrder(swapInput, amounts, limitOrderFillDetailMap, maxFillCount, out var orderFilledCount);
+                MixSwapExactTokensForTokensAndLimitOrder(swapInput, amounts, limitOrderFillDetailMap, maxFillCount, 
+                    out var orderFilledCount, out var amountOut);
                 maxFillCount -= orderFilledCount;
+                RecordTotalAmountOut(totalAmountOutMap, swapInput.To, swapInput.Path[swapInput.FeeRates.Count], amountOut);
                 continue;
             }
             
@@ -67,18 +72,68 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
                     AmountOutMin = amounts[pathCount + 1],
                     Deadline = swapInput.Deadline,
                     Channel = swapInput.Channel,
-                    To = pathCount == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self
+                    To = Context.Self
                 };
                 for (var index = beginIndex; index <= pathCount + 1; index++) {
                     swapExactTokensForTokensInput.Path.Add(swapInput.Path[index]);
                 }
-
                 Context.SendInline(swapContractAddress, nameof(SwapExactTokensForTokens), swapExactTokensForTokensInput.ToByteString());
                 beginIndex = pathCount + 1;
             }
+            RecordTotalAmountOut(totalAmountOutMap, swapInput.To, swapInput.Path[swapInput.FeeRates.Count], amounts[swapInput.FeeRates.Count]);
         }
+
+        foreach (var totalAmountOutPair in totalAmountOutMap)
+        {
+            foreach (var symbolToAmountPair in totalAmountOutPair.Value)
+            {
+                var amountOut = symbolToAmountPair.Value;
+                if (input.LabsFeeRate > 0)
+                {
+                    var labsFee = input.LabsFeeRate * amountOut / FeeRateMax;
+                    if (labsFee > 0)
+                    {
+                        State.TokenContract.Transfer.Send(new TransferInput
+                        {
+                            Symbol = symbolToAmountPair.Key,
+                            Amount = labsFee,
+                            To = State.LabsFeeTo.Value,
+                            Memo = "Hooks Labs Fee"
+                        });
+                        Context.Fire(new LabsFeeCharged
+                        {
+                            Address = input.SwapTokens[0].To,
+                            Symbol = symbolToAmountPair.Key,
+                            Amount = labsFee,
+                            FeeTo = State.LabsFeeTo.Value
+                        });
+                        amountOut -= labsFee;
+                    }
+                }
+                State.TokenContract.Transfer.Send(new TransferInput
+                {
+                    Symbol = symbolToAmountPair.Key,
+                    Amount = amountOut,
+                    To = totalAmountOutPair.Key,
+                    Memo = "Hooks Swap"
+                });
+            }
+        }
+
         FireHooksTransactionCreatedLogEvent(nameof(SwapExactTokensForTokens), input.ToByteString());
         return new Empty();
+    }
+
+    private void RecordTotalAmountOut(Dictionary<Address, Dictionary<string, long>> totalAmountOutMap, Address to, string symbol, long amount)
+    {
+        var symbolToAmount = totalAmountOutMap.GetValueOrDefault(to, null);
+        if (symbolToAmount == null)
+        {
+            symbolToAmount = new Dictionary<string, long>();
+            totalAmountOutMap[to] = symbolToAmount;
+        }
+        symbolToAmount[symbol] =
+            symbolToAmount.GetValueOrDefault(symbol, 0) + amount;
     }
 
     public override Empty SwapTokensForExactTokens(SwapTokensForExactTokensInput input)

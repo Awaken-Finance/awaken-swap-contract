@@ -59,4 +59,19 @@ public partial class AwakenHooksContract
         State.OrderContract.Value = input;
         return new Empty();
     }
+
+    public override Empty SetLabsFeeRate(Int64Value input)
+    {
+        CheckAdminPermission();
+        State.LabsFeeRate.Value = input.Value;
+        return new Empty();
+    }
+
+    public override Empty SetLabsFeeTo(Address input)
+    {
+        CheckAdminPermission();
+        Assert(!input.Value.IsNullOrEmpty(), "Invalid input.");
+        State.LabsFeeTo.Value = input;
+        return new Empty();
+    }
 }

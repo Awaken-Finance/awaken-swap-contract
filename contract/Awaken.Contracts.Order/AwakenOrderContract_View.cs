@@ -155,4 +155,17 @@ public partial class AwakenOrderContract
             CommitPriceIncreaseRate = State.CommitPriceIncreaseRate.Value
         };
     }
+    
+    public override Address GetLabsFeeTo(Empty input)
+    {
+        return State.LabsFeeTo.Value;
+    }
+
+    public override Int64Value GetLabsFeeRate(Empty input)
+    {
+        return new Int64Value
+        {
+            Value = State.LabsFeeRate.Value
+        };
+    }
 }
