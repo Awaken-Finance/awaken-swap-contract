@@ -506,6 +506,10 @@ public partial class AwakenHooksContractTests
         {
             Value = 50
         });
+        var labsFeeTo = await AdminOrderStud.GetLabsFeeTo.CallAsync(new Empty());
+        var labsFeeRate = await AdminOrderStud.GetLabsFeeRate.CallAsync(new Empty());
+        labsFeeTo.ShouldBe(UserTomAddress);
+        labsFeeRate.Value.ShouldBe(50);
         var limitOrderId4 = await UserTomCommitLimitOrder(50);
         var result = await AdminOrderStud.FillLimitOrder.SendAsync(new FillLimitOrderInput
         {
@@ -613,7 +617,13 @@ public partial class AwakenHooksContractTests
             MultiSwapMatchLimitOrderEnabled = true,
             MaxFillLimitOrderCount = 10
         });
+        var limitOrderConfig = await AdminHooksStud.GetLimitOrderConfig.CallAsync(new Empty());
+        limitOrderConfig.MatchLimitOrderEnabled.ShouldBe(true);
+        limitOrderConfig.MultiSwapMatchLimitOrderEnabled.ShouldBe(true);
+        limitOrderConfig.MaxFillLimitOrderCount.ShouldBe(10);
         await AdminHooksStud.SetOrderContract.SendAsync(OrderContractAddress);
+        var orderContract = await AdminHooksStud.GetOrderContract.CallAsync(new Empty());
+        orderContract.ShouldBe(OrderContractAddress);
         await AdminOrderStud.Initialize.SendAsync(new Order.InitializeInput
         {
             HooksContractAddress = AwakenHooksContractAddress

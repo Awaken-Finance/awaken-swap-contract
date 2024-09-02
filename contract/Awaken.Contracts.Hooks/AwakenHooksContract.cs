@@ -82,15 +82,21 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
             }
             RecordTotalAmountOut(totalAmountOutMap, swapInput.To, swapInput.Path[swapInput.FeeRates.Count], amounts[swapInput.FeeRates.Count]);
         }
+        ChargeLabsFee(totalAmountOutMap, input.LabsFeeRate);
+        FireHooksTransactionCreatedLogEvent(nameof(SwapExactTokensForTokens), input.ToByteString());
+        return new Empty();
+    }
 
+    private void ChargeLabsFee(Dictionary<Address, Dictionary<string, long>> totalAmountOutMap, long labsFeeRate)
+    {
         foreach (var totalAmountOutPair in totalAmountOutMap)
         {
             foreach (var symbolToAmountPair in totalAmountOutPair.Value)
             {
                 var amountOut = symbolToAmountPair.Value;
-                if (input.LabsFeeRate > 0)
+                if (labsFeeRate > 0)
                 {
-                    var labsFee = input.LabsFeeRate * amountOut / FeeRateMax;
+                    var labsFee = labsFeeRate * amountOut / FeeRateMax;
                     if (labsFee > 0)
                     {
                         State.TokenContract.Transfer.Send(new TransferInput
@@ -102,7 +108,7 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
                         });
                         Context.Fire(new LabsFeeCharged
                         {
-                            Address = input.SwapTokens[0].To,
+                            Address = totalAmountOutPair.Key,
                             Symbol = symbolToAmountPair.Key,
                             Amount = labsFee,
                             FeeTo = State.LabsFeeTo.Value
@@ -119,9 +125,6 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
                 });
             }
         }
-
-        FireHooksTransactionCreatedLogEvent(nameof(SwapExactTokensForTokens), input.ToByteString());
-        return new Empty();
     }
 
     private void RecordTotalAmountOut(Dictionary<Address, Dictionary<string, long>> totalAmountOutMap, Address to, string symbol, long amount)
@@ -139,13 +142,15 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
     public override Empty SwapTokensForExactTokens(SwapTokensForExactTokensInput input)
     {
         Assert(input.SwapTokens.Count > 0, "Invalid input.");
+        Assert(input.LabsFeeRate >= 0 && input.LabsFeeRate <= State.LabsFeeRate.Value, "Invalid labsFeeRate.");
         var limitOrderFillDetailMap = new Dictionary<string, FillDetail>();
         var maxFillCount = State.MaxFillLimitOrderCount.Value;
+        var totalAmountOutMap = new Dictionary<Address, Dictionary<string, long>>();
         foreach (var swapInput in input.SwapTokens)
         {
             var amounts = GetAmountsIn(swapInput.AmountOut, swapInput.Path, swapInput.FeeRates);
             Assert(amounts[0] <= swapInput.AmountInMax, "Excessive Input amount");
-
+            RecordTotalAmountOut(totalAmountOutMap, swapInput.To, swapInput.Path[swapInput.FeeRates.Count], swapInput.AmountOut);
             if (maxFillCount > 0 && State.MatchLimitOrderEnabled.Value &&
                 (swapInput.FeeRates.Count == 1 || State.MultiSwapMatchLimitOrderEnabled.Value))
             {
@@ -175,7 +180,7 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
                     AmountOut = amounts[pathCount + 1],
                     Deadline = swapInput.Deadline,
                     Channel = swapInput.Channel,
-                    To = pathCount == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self
+                    To = Context.Self
                 };
                 for (var index = beginIndex; index <= pathCount + 1; index++) {
                     swapTokensForExactTokensInput.Path.Add(swapInput.Path[index]);
@@ -184,6 +189,7 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
                 beginIndex = pathCount + 1;
             }
         }
+        ChargeLabsFee(totalAmountOutMap, input.LabsFeeRate);
         FireHooksTransactionCreatedLogEvent(nameof(SwapTokensForExactTokens), input.ToByteString());
         return new Empty();
     }

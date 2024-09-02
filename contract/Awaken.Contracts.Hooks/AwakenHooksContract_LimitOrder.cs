@@ -288,7 +288,7 @@ public partial class AwakenHooksContract
                     Path = { swapInput.Path[i], swapInput.Path[i + 1] },
                     Deadline = swapInput.Deadline,
                     Channel = swapInput.Channel,
-                    To = i == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self
+                    To = Context.Self
                 };
                 Context.SendInline(swapContractAddress, nameof(SwapTokensForExactTokens), swapTokensForExactTokensInput.ToByteString());
             }
@@ -307,7 +307,7 @@ public partial class AwakenHooksContract
                     SymbolOut = swapInput.Path[i],
                     AmountIn = amountsOrder[2 * i + 1],
                     MaxCloseIntervalPrice = fillDetailMap[swapInput.Path[i] + "-" + swapInput.Path[i + 1]].Price,
-                    To = i == swapInput.FeeRates.Count - 1 ? swapInput.To : Context.Self
+                    To = Context.Self
                 });
             }
         }
