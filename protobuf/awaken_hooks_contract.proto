@@ -234,6 +234,6 @@ message LabsFeeCharged{
   aelf.Address address = 1;
   string symbol = 2;
   int64 amount = 3;
-  aelf.Address feeTo = 4;
+  aelf.Address fee_to = 4;
 }
 
