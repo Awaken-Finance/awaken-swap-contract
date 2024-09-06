@@ -28,4 +28,7 @@ public partial class AwakenOrderContractState : ContractState
     public MappedState<long, PriceBook> PriceBookMap {get; set;}
     
     public MappedState<Address, LimitOrderIdList> UserLimitOrderIdsMap { get; set; }
+    
+    public SingletonState<long> LabsFeeRate { get; set; }
+    public SingletonState<Address> LabsFeeTo { get; set; }
 }

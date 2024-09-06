@@ -34,6 +34,10 @@ service AwakenOrderContract {
   }
   rpc FillLimitOrder (FillLimitOrderInput) returns (google.protobuf.Empty) {
   }
+  rpc SetLabsFeeRate (google.protobuf.Int64Value) returns (google.protobuf.Empty) {
+  }
+  rpc SetLabsFeeTo (aelf.Address) returns (google.protobuf.Empty) {
+  }
   // view
 
   rpc GetFillResult (GetFillResultInput) returns (GetFillResultOutput) {
@@ -80,6 +84,12 @@ service AwakenOrderContract {
   }
 
   rpc CalculatePrice (CalculatePriceInput) returns (google.protobuf.Int64Value) {
+    option (aelf.is_view) = true;
+  }
+  rpc GetLabsFeeTo (google.protobuf.Empty) returns (aelf.Address) {
+    option (aelf.is_view) = true;
+  }
+  rpc GetLabsFeeRate (google.protobuf.Empty) returns (google.protobuf.Int64Value) {
     option (aelf.is_view) = true;
   }
 }
@@ -135,6 +145,7 @@ message CommitLimitOrderInput {
   int64 amount_out = 3;
   string symbol_out = 4;
   google.protobuf.Timestamp deadline = 5;
+  int64 labs_fee_rate = 6;
 }
 
 message CancelLimitOrderInput {
@@ -210,6 +221,7 @@ message UserLimitOrder {
   int64 amount_in_filled = 7;
   int64 order_id = 8;
   int64 amount_out_filled = 9;
+  int64 labs_fee_rate = 10;
 }
 
 message PriceBook {

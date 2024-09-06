@@ -500,6 +500,28 @@ public partial class AwakenHooksContractTests
             Value = limitOrderId3
         });
         limitOrder3.OrderId.ShouldBe(0);
+
+        await AdminOrderStud.SetLabsFeeTo.SendAsync(UserTomAddress);
+        await AdminOrderStud.SetLabsFeeRate.SendAsync(new Int64Value()
+        {
+            Value = 50
+        });
+        var labsFeeTo = await AdminOrderStud.GetLabsFeeTo.CallAsync(new Empty());
+        var labsFeeRate = await AdminOrderStud.GetLabsFeeRate.CallAsync(new Empty());
+        labsFeeTo.ShouldBe(UserTomAddress);
+        labsFeeRate.Value.ShouldBe(50);
+        var limitOrderId4 = await UserTomCommitLimitOrder(50);
+        var result = await AdminOrderStud.FillLimitOrder.SendAsync(new FillLimitOrderInput
+        {
+            SymbolIn = "ELF",
+            SymbolOut = "TEST",
+            MaxCloseIntervalPrice = 300000000,
+            AmountIn = 200,
+            To = UserLilyAddress
+        });
+        var limitOrderFilled4 = LimitOrderFilled.Parser.ParseFrom(result.TransactionResult.Logs.First(t => t.Name == nameof(LimitOrderFilled)).NonIndexed);
+        limitOrderFilled4.OrderId.ShouldBe(limitOrderId4);
+        limitOrderFilled4.TotalFee.ShouldBe(1);
     }
 
     [Fact]
@@ -595,7 +617,13 @@ public partial class AwakenHooksContractTests
             MultiSwapMatchLimitOrderEnabled = true,
             MaxFillLimitOrderCount = 10
         });
+        var limitOrderConfig = await AdminHooksStud.GetLimitOrderConfig.CallAsync(new Empty());
+        limitOrderConfig.MatchLimitOrderEnabled.ShouldBe(true);
+        limitOrderConfig.MultiSwapMatchLimitOrderEnabled.ShouldBe(true);
+        limitOrderConfig.MaxFillLimitOrderCount.ShouldBe(10);
         await AdminHooksStud.SetOrderContract.SendAsync(OrderContractAddress);
+        var orderContract = await AdminHooksStud.GetOrderContract.CallAsync(new Empty());
+        orderContract.ShouldBe(OrderContractAddress);
         await AdminOrderStud.Initialize.SendAsync(new Order.InitializeInput
         {
             HooksContractAddress = AwakenHooksContractAddress
@@ -1280,7 +1308,7 @@ public partial class AwakenHooksContractTests
         firstSwap.AmountOut.ShouldBe(100000 + secondSwap.AmountIn);
     }
 
-    private async Task<long> UserTomCommitLimitOrder()
+    private async Task<long> UserTomCommitLimitOrder(long labsFeeRate = 0)
     {
         await UserTomTokenContractStub.Approve.SendAsync(
             new ApproveInput
@@ -1295,7 +1323,8 @@ public partial class AwakenHooksContractTests
             SymbolOut = "TEST",
             AmountIn = 100,
             AmountOut = 200,
-            Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 1, 0)))
+            Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 1, 0))),
+            LabsFeeRate = labsFeeRate
         });
         var logEvent = result.TransactionResult.Logs.First(t => t.Name == nameof(LimitOrderCreated));
         return LimitOrderCreated.Parser.ParseFrom(logEvent.NonIndexed).OrderId;

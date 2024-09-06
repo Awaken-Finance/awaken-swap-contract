@@ -15,6 +15,7 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
     public override Empty CommitLimitOrder(CommitLimitOrderInput input)
     {
         Assert(input.AmountIn > 0 && input.AmountOut > 0 && input.Deadline > Context.CurrentBlockTime, "Invalid input.");
+        Assert(input.LabsFeeRate >= 0 && input.LabsFeeRate <= State.LabsFeeRate.Value, "Invalid labsFeeRate.");
         AssertContractInitialized();
         var orderBookConfig = State.OrderBookConfig.Value;
         AssertAllowanceAndBalance(input.SymbolIn, input.AmountIn);
@@ -67,7 +68,8 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
             AmountOut = realAmountOut,
             Deadline = input.Deadline,
             Maker = Context.Sender,
-            CommitTime = Context.CurrentBlockTime
+            CommitTime = Context.CurrentBlockTime,
+            LabsFeeRate = input.LabsFeeRate
         };
         var orderBook = State.OrderBookMap[headOrderBookId] ?? new OrderBook
         {
@@ -368,7 +370,7 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
             var userBalanceUsed = userBalanceUsedMap.GetValueOrDefault(userLimitOrder.Maker, 0);
             userBalanceUsedMap[userLimitOrder.Maker] = userBalanceUsed + amountIn;
             
-            SwapInternal(userLimitOrder.Maker, to, orderBook.SymbolIn, orderBook.SymbolOut, amountIn, amountOut);
+            SwapInternal(userLimitOrder.Maker, to, userLimitOrder.LabsFeeRate, orderBook.SymbolIn, orderBook.SymbolOut, amountIn, amountOut, out var labsFee);
             userLimitOrder.AmountInFilled += amountIn;
             userLimitOrder.AmountOutFilled += amountOut;
             userLimitOrder.FillTime = Context.CurrentBlockTime;
@@ -380,7 +382,8 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
                 FillTime = Context.CurrentBlockTime,
                 Taker = to,
                 SymbolIn = orderBook.SymbolIn,
-                SymbolOut = orderBook.SymbolOut
+                SymbolOut = orderBook.SymbolOut,
+                TotalFee = labsFee
             });
             if (userLimitOrder.AmountInFilled == userLimitOrder.AmountIn || userLimitOrder.AmountOutFilled == userLimitOrder.AmountOut)
             {
@@ -477,8 +480,9 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         }
     }
 
-    private void SwapInternal(Address maker, Address taker, string symbolIn, string symbolOut, long amountIn, long amountOut)
+    private void SwapInternal(Address maker, Address taker, long labsFeeRate, string symbolIn, string symbolOut, long amountIn, long amountOut, out long labsFee)
     {
+        labsFee = 0;
         if (maker != taker)
         {
             State.TokenContract.TransferFrom.Send(new TransferFromInput
@@ -492,6 +496,23 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         }
         if (Context.Sender != maker)
         {
+            if (labsFeeRate > 0)
+            {
+                labsFee = labsFeeRate * amountOut / IncreaseRateMax;
+                if (labsFee > 0)
+                {
+                    State.TokenContract.TransferFrom.Send(new TransferFromInput
+                    {
+                        From = Context.Sender,
+                        To = State.LabsFeeTo.Value,
+                        Symbol = symbolOut,
+                        Amount = labsFee,
+                        Memo = "Limit Order Labs Fee"
+                    });
+                    amountOut -= labsFee;
+                }
+            }
+
             State.TokenContract.TransferFrom.Send(new TransferFromInput
             {
                 From = Context.Sender,

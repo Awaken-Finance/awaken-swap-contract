@@ -151,6 +151,21 @@ public partial class AwakenOrderContract
     {
         return State.FillOrderWhiteList.Value;
     }
+    
+    public override Empty SetLabsFeeRate(Int64Value input)
+    {
+        AssertSenderIsAdmin();
+        State.LabsFeeRate.Value = input.Value;
+        return new Empty();
+    }
+
+    public override Empty SetLabsFeeTo(Address input)
+    {
+        AssertSenderIsAdmin();
+        Assert(!input.Value.IsNullOrEmpty(), "Invalid input.");
+        State.LabsFeeTo.Value = input;
+        return new Empty();
+    }
 
     private void AssertContractInitialized()
     {
