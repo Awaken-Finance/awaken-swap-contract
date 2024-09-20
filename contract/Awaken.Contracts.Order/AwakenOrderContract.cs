@@ -6,6 +6,7 @@ using AElf.CSharp.Core;
 using AElf.Sdk.CSharp;
 using AElf.Types;
 using Awaken.Contracts.Hooks;
+using Google.Protobuf.Collections;
 using Google.Protobuf.WellKnownTypes;
 
 namespace Awaken.Contracts.Order;
@@ -20,6 +21,38 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
         var orderBookConfig = State.OrderBookConfig.Value;
         AssertAllowanceAndBalance(input.SymbolIn, input.AmountIn);
         var orderIdList = State.UserLimitOrderIdsMap[Context.Sender];
+        if (orderIdList?.LimitOrderIds.Count > 0)
+        {
+            var removeOrderIds = new RepeatedField<long>();
+            foreach (var orderId in orderIdList.LimitOrderIds)
+            {
+                var orderBookId = State.OrderIdToOrderBookIdMap[orderId];
+                var relationOrderBook = State.OrderBookMap[orderBookId];
+                if (relationOrderBook == null)
+                {
+                    removeOrderIds.Add(orderId);
+                    continue;
+                }
+                var userLimitOrder = relationOrderBook.UserLimitOrders.FirstOrDefault(t => t.OrderId == orderId);
+                if (userLimitOrder != null && userLimitOrder.Deadline < Context.CurrentBlockTime)
+                {
+                    relationOrderBook.UserLimitOrders.Remove(userLimitOrder);
+                    State.OrderIdToOrderBookIdMap.Remove(orderId);
+                    removeOrderIds.Add(orderId);
+                    Context.Fire(new LimitOrderRemoved
+                    {
+                        OrderId = orderId,
+                        RemoveTime = Context.CurrentBlockTime,
+                        ReasonType = ReasonType.Expired
+                    });
+                }
+            }
+            foreach (var orderId in removeOrderIds)
+            {
+                orderIdList.LimitOrderIds.Remove(orderId);
+            }
+        }
+
         Assert(orderIdList == null || orderIdList.LimitOrderIds.Count < orderBookConfig.UserPendingOrdersLimit, "Pending orders count limit.");
         CalculatePrice(input.SymbolIn, input.SymbolOut, input.AmountIn, input.AmountOut, true, out var price, out var realAmountOut);
         realAmountOut = Math.Max(realAmountOut, 1);
