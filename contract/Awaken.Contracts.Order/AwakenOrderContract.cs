@@ -6,6 +6,7 @@ using AElf.CSharp.Core;
 using AElf.Sdk.CSharp;
 using AElf.Types;
 using Awaken.Contracts.Hooks;
+using Awaken.Contracts.Points;
 using Google.Protobuf.Collections;
 using Google.Protobuf.WellKnownTypes;
 
@@ -149,6 +150,18 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
             Maker = Context.Sender,
             Deadline = input.Deadline,
             OrderId = lastOrderId
+        });
+        State.AwakenPointsContract.FinishAction.Send(new FinishActionInput
+        {
+            ActionType = ActionType.CommitLimitOrder,
+            ActionDetail = new ActionDetail
+            {
+                Address = Context.Sender,
+                AmountA = input.AmountIn,
+                AmountB = realAmountOut,
+                SymbolA = input.SymbolIn,
+                SymbolB = input.SymbolOut
+            }
         });
         return new Empty();
     }
@@ -417,6 +430,18 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
                 SymbolIn = orderBook.SymbolIn,
                 SymbolOut = orderBook.SymbolOut,
                 TotalFee = labsFee
+            });
+            State.AwakenPointsContract.FinishAction.Send(new FinishActionInput
+            {
+                ActionType = ActionType.LimitOrderFilled,
+                ActionDetail = new ActionDetail
+                {
+                    Address = userLimitOrder.Maker,
+                    AmountA = amountIn,
+                    AmountB = amountOut,
+                    SymbolA = orderBook.SymbolIn,
+                    SymbolB = orderBook.SymbolOut
+                }
             });
             if (userLimitOrder.AmountInFilled == userLimitOrder.AmountIn || userLimitOrder.AmountOutFilled == userLimitOrder.AmountOut)
             {

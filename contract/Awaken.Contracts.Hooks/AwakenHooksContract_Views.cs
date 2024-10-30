@@ -1,3 +1,4 @@
+using System.Linq;
 using AElf.Types;
 using Awaken.Contracts.Token;
 using Google.Protobuf.WellKnownTypes;
@@ -76,6 +77,23 @@ public partial class AwakenHooksContract
             }
         }
         return result;
+    }
+
+    public override Int64Value Quote(QuoteInput input)
+    {
+        var swapContract =
+            State.SwapContractInfoList.Value.SwapContracts.FirstOrDefault(t =>
+                t.FeeRate == input.FeeRate);
+        if (swapContract == null) return new Int64Value
+        {
+            Value = 0
+        };
+        return Context.Call<Int64Value>(swapContract.SwapContractAddress, nameof(Quote), new Swap.QuoteInput()
+        {
+            AmountA = input.AmountA,
+            SymbolA = input.SymbolA,
+            SymbolB = input.SymbolB
+        });
     }
 
     public override Address GetOrderContract(Empty input)

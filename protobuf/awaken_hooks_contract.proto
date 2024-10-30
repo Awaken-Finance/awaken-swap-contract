@@ -56,6 +56,11 @@ service AwakenHooksContract {
   rpc GetAllReverse (GetAllReverseInput) returns (GetAllReverseOutput) {
     option (aelf.is_view) = true;
   }
+
+  rpc Quote (QuoteInput) returns (google.protobuf.Int64Value) {
+    option (aelf.is_view) = true;
+  }
+  
   rpc GetLimitOrderConfig(google.protobuf.Empty) returns (GetLimitOrderConfigOutput) {
     option (aelf.is_view) = true;
   }
@@ -171,6 +176,13 @@ message SwapTokensForExactTokens {
 message GetAllReverseInput {
   string symbol_a = 1;
   string symbol_b = 2;
+}
+
+message QuoteInput {
+  string symbol_a = 1;
+  string symbol_b = 2;
+  int64 amount_a = 3;
+  int64 fee_rate = 4;
 }
 
 // Outputs
