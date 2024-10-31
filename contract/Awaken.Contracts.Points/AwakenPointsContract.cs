@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using AElf;
 using AElf.Contracts.MultiToken;
@@ -6,13 +5,12 @@ using AElf.CSharp.Core;
 using AElf.Sdk.CSharp;
 using AElf.Types;
 using Awaken.Contracts.Hooks;
-using Google.Protobuf.Collections;
 using Google.Protobuf.WellKnownTypes;
 using Points.Contracts.Point;
 
 namespace Awaken.Contracts.Points;
 
-public partial class AwakenPointsContract : AwakenPointsContractContainer.AwakenPointsContractBase
+public partial class AwakenPointsContract : AwakenPointsContractImplContainer.AwakenPointsContractImplBase
 {
     public override Empty Join(JoinInput input)
     {
@@ -172,7 +170,8 @@ public partial class AwakenPointsContract : AwakenPointsContractContainer.Awaken
 
     private long CalculateValue(string symbol, long amount)
     {
-        var price = State.PriceMap[symbol];
+        var symbolHash = HashHelper.ComputeFrom(symbol);
+        var price = State.PriceMap[symbolHash];
         var tokenInfo = State.TokenContract.GetTokenInfo.Call(new GetTokenInfoInput
         {
             Symbol = symbol
@@ -184,7 +183,9 @@ public partial class AwakenPointsContract : AwakenPointsContractContainer.Awaken
             {
                 return 0;
             }
-            var fromSymbolPrice = State.PriceMap[pricingToken.FromSymbol];
+
+            var fromSymbolHash = HashHelper.ComputeFrom(pricingToken.FromSymbol);
+            var fromSymbolPrice = State.PriceMap[fromSymbolHash];
             if (fromSymbolPrice <= 0)
             {
                 return 0;

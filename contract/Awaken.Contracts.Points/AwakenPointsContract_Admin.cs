@@ -19,8 +19,10 @@ public partial class AwakenPointsContract
         Assert(!input.PointsContractAddress.Value.IsNullOrEmpty(), "Invalid points contract address.");
         Assert(!input.HooksContractAddress.Value.IsNullOrEmpty(), "Invalid hooks contract address.");
         Assert(!input.OrderContractAddress.Value.IsNullOrEmpty(), "Invalid order contract address.");
+        Assert(!input.OracleContractAddress.Value.IsNullOrEmpty(), "Invalid oracle contract address.");
         State.PointsContract.Value = input.PointsContractAddress;
         State.HooksContract.Value = input.HooksContractAddress;
+        State.OracleContract.Value = input.OracleContractAddress;
         State.OrderContractAddress.Value = input.OrderContractAddress;
         State.Admin.Value = input.Admin ?? Context.Sender;
         State.PointsSettleAdmin.Value = input.PointsSettleAdmin ?? Context.Sender;
@@ -94,6 +96,30 @@ public partial class AwakenPointsContract
         return new Empty();
     }
 
+    public override Empty SetHooksContract(Address input)
+    {
+        Assert(IsAddressValid(input), "Invalid input.");
+        CheckAdminPermission();
+        State.HooksContract.Value = input;
+        return new Empty();
+    }
+
+    public override Empty SetOrderContract(Address input)
+    {
+        Assert(IsAddressValid(input), "Invalid input.");
+        CheckAdminPermission();
+        State.OrderContractAddress.Value = input;
+        return new Empty();
+    }
+
+    public override Empty SetOracleContract(Address input)
+    {
+        Assert(IsAddressValid(input), "Invalid input.");
+        CheckAdminPermission();
+        State.OracleContract.Value = input;
+        return new Empty();
+    }
+
     public override Empty SetPricingToken(SetPricingTokenInput input)
     {
         CheckAdminPermission();
@@ -103,6 +129,14 @@ public partial class AwakenPointsContract
             State.PricingTokenMap[pricingToken.Symbol] = pricingToken;
         }
         return new Empty();;
+    }
+
+    public override Empty SetSubscriptId(Int64Value input)
+    {
+        Assert(input.Value > 0, "Invalid input.");
+        CheckAdminPermission();
+        State.SubscriptionId.Value = input.Value;
+        return new Empty();
     }
 
     private void CheckSettleAdminPermission()

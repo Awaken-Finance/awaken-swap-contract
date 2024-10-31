@@ -12,8 +12,8 @@
         <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
     </PropertyGroup>
     <ItemGroup>
-        <ContractCode Include="..\..\protobuf\awaken_points_contract.proto">
-            <Link>Protobuf\Proto\awaken_points_contract.proto</Link>
+        <ContractCode Include="..\..\protobuf\awaken_points_contract_impl.proto">
+            <Link>Protobuf\Proto\awaken_points_contract_impl.proto</Link>
         </ContractCode>
         <ContractBase Include="..\..\protobuf\acs12.proto">
             <Link>Protobuf\Proto\acs12.proto</Link>
@@ -27,6 +27,12 @@
         <ContractBase Include="..\..\protobuf\authority_info.proto">
             <Link>Protobuf\Proto\reference\authority_info.proto</Link>
         </ContractBase>
+        <ContractBase Include="..\..\protobuf\request_interface.proto">
+            <Link>Protobuf\Proto\request_interface.proto</Link>
+        </ContractBase>
+        <ContractBase Include="..\..\protobuf\awaken_points_contract.proto">
+            <Link>Protobuf\Proto\awaken_points_contract.proto</Link>
+        </ContractBase>
         <ContractReference Include="..\..\protobuf\acs0.proto">
             <Link>Protobuf\Proto\reference\acs0.proto</Link>
         </ContractReference>
@@ -38,6 +44,12 @@
         </ContractReference>
         <ContractReference Include="..\..\protobuf\awaken_hooks_contract.proto">
             <Link>Protobuf\Proto\reference\awaken_hooks_contract.proto</Link>
+        </ContractReference>
+        <CommonMessage Include="..\..\protobuf\oracle_common_message.proto">
+            <Link>Protobuf\Proto\reference\oracle_common_message.proto</Link>
+        </CommonMessage>
+        <ContractReference Include="..\..\protobuf\oracle_contract.proto">
+            <Link>Protobuf\Proto\reference\oracle_contract.proto</Link>
         </ContractReference>
     </ItemGroup>
 </Project>

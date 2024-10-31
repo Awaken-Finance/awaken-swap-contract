@@ -19,7 +19,9 @@ public partial class AwakenPointsContractState : ContractState
     public MappedState<Address, string, bool> DisposablePointsSettleRecord { get; set; }
     // action name -> point amount
     public MappedState<string, PointsRewardConfig> PointsRewardConfig { get; set; }
-    public MappedState<string, long> PriceMap { get; set; }
+    // Hash(symbol) -> price
+    public MappedState<Hash, long> PriceMap { get; set; }
 
     public MappedState<string, PricingToken> PricingTokenMap { get; set; }
+    public SingletonState<long> SubscriptionId { get; set; }
 }
