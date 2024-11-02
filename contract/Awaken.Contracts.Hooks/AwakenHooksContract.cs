@@ -120,7 +120,7 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
 
     private void FinishSwapAction(string symbolIn, long amountIn, string symbolOut, long amountOut)
     {
-        if (State.AwakenPointsContract.Value.Value.IsNullOrEmpty())
+        if (CheckPointsContract())
         {
             return;
         }
@@ -277,18 +277,21 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
             To = input.To
         });
         FireHooksTransactionCreatedLogEvent(nameof(AddLiquidity), input.ToByteString());
-        State.AwakenPointsContract.FinishAction.Send(new FinishActionInput
+        if (CheckPointsContract())
         {
-            ActionType = ActionType.AddLiquidity,
-            ActionDetail = new ActionDetail
+            State.AwakenPointsContract.FinishAction.Send(new FinishActionInput
             {
-                Address = input.To,
-                SymbolA = input.SymbolA,
-                AmountA = amounts[0],
-                SymbolB = input.SymbolB,
-                AmountB = amounts[1]
-            }
-        });
+                ActionType = ActionType.AddLiquidity,
+                ActionDetail = new ActionDetail
+                {
+                    Address = input.To,
+                    SymbolA = input.SymbolA,
+                    AmountA = amounts[0],
+                    SymbolB = input.SymbolB,
+                    AmountB = amounts[1]
+                }
+            });
+        }
         return new Empty();
     }
 
@@ -331,5 +334,10 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
             MethodName = methodName,
             Args = args
         });
+    }
+
+    private bool CheckPointsContract()
+    {
+        return State.AwakenPointsContract.Value != null && !State.AwakenPointsContract.Value.Value.IsNullOrEmpty();
     }
 }

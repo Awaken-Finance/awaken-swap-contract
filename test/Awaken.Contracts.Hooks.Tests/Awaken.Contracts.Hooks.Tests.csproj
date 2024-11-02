@@ -76,13 +76,19 @@
         <ContractStub Include="..\..\protobuf\awaken_order_contract.proto">
             <Link>Protobuf\Proto\awaken_order_contract.proto</Link>
         </ContractStub>
+        <ContractStub Include="..\..\protobuf\awaken_points_contract.proto">
+            <Link>Protobuf\Proto\awaken_points_contract.proto</Link>
+        </ContractStub>
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\..\contract\Awaken.Contracts.Hooks\Awaken.Contracts.Hooks.csproj" />
         <ProjectReference Include="..\..\contract\Awaken.Contracts.Order\Awaken.Contracts.Order.csproj" />
+        <ProjectReference Include="..\..\contract\Awaken.Contracts.Points\Awaken.Contracts.Points.csproj" />
         <ProjectReference Include="..\..\contract\Awaken.Contracts.Swap\Awaken.Contracts.Swap.csproj" />
         <ProjectReference Include="..\..\contract\Awaken.Contracts.Token\Awaken.Contracts.Token.csproj" />
+        <ProjectReference Include="..\..\test\Awaken.Contracts.MockPointsContract\Awaken.Contracts.MockPointsContract.csproj" />
+        <ProjectReference Include="..\..\test\Awaken.Contracts.MockOracleContract\Awaken.Contracts.MockOracleContract.csproj" />
         <ProjectReference Include="..\..\src\AElf.Boilerplate.TestBase\AElf.Boilerplate.TestBase.csproj" />
     </ItemGroup>
 </Project>

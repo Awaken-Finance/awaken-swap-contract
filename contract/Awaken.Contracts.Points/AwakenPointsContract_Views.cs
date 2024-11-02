@@ -68,7 +68,7 @@ public partial class AwakenPointsContract
     {
         return new StringValue
         {
-            Value = State.OfficialDomainAlias.Value
+            Value = State.OfficialDomainAlias.Value ?? ""
         };
     }
 

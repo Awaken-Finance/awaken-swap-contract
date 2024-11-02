@@ -16,17 +16,21 @@ public partial class AwakenPointsContract
         Assert(Context.Sender == author, "No permission.");
         State.TokenContract.Value =
             Context.GetContractAddressByName(SmartContractConstants.TokenContractSystemName);
-        Assert(!input.PointsContractAddress.Value.IsNullOrEmpty(), "Invalid points contract address.");
-        Assert(!input.HooksContractAddress.Value.IsNullOrEmpty(), "Invalid hooks contract address.");
-        Assert(!input.OrderContractAddress.Value.IsNullOrEmpty(), "Invalid order contract address.");
-        Assert(!input.OracleContractAddress.Value.IsNullOrEmpty(), "Invalid oracle contract address.");
+        Assert(IsAddressValid(input.PointsContractAddress), "Invalid points contract address.");
+        Assert(IsAddressValid(input.HooksContractAddress), "Invalid hooks contract address.");
+        Assert(IsAddressValid(input.OrderContractAddress), "Invalid order contract address.");
+        Assert(IsAddressValid(input.OracleContractAddress), "Invalid oracle contract address.");
         State.PointsContract.Value = input.PointsContractAddress;
         State.HooksContract.Value = input.HooksContractAddress;
         State.OracleContract.Value = input.OracleContractAddress;
         State.OrderContractAddress.Value = input.OrderContractAddress;
         State.Admin.Value = input.Admin ?? Context.Sender;
         State.PointsSettleAdmin.Value = input.PointsSettleAdmin ?? Context.Sender;
+        State.OfficialDomainAlias.Value = input.OfficialDomainAlias;
+        State.SubscriptionId.Value = input.SubscriptionId;
+        State.PointsContractDAppId.Value = input.PointsContractDAppId;
         SetPointsRewardConfigList(input.PointsRewardConfigs);
+        SetPricingTokens(input.PricingTokens);
         return new Empty();
     }
 
@@ -123,12 +127,17 @@ public partial class AwakenPointsContract
     public override Empty SetPricingToken(SetPricingTokenInput input)
     {
         CheckAdminPermission();
-        foreach (var pricingToken in input.PricingTokens)
+        SetPricingTokens(input.PricingTokens);
+        return new Empty();;
+    }
+
+    private void SetPricingTokens(RepeatedField<PricingToken> pricingTokens)
+    {
+        foreach (var pricingToken in pricingTokens)
         {
             Assert(IsStringValid(pricingToken.Symbol) && IsStringValid(pricingToken.FromSymbol), "Invalid symbol and fromSymbol.");
             State.PricingTokenMap[pricingToken.Symbol] = pricingToken;
         }
-        return new Empty();;
     }
 
     public override Empty SetSubscriptId(Int64Value input)

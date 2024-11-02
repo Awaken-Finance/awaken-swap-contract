@@ -64,6 +64,8 @@ message InitializeInput {
   repeated PointsRewardConfig points_reward_configs = 7;
   repeated PricingToken pricing_tokens = 8;
   string official_domain_alias = 9;
+  aelf.Hash points_contract_d_app_id = 10;
+  int64 subscription_id = 11;
 }
 
 message JoinInput {

@@ -151,18 +151,21 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
             Deadline = input.Deadline,
             OrderId = lastOrderId
         });
-        State.AwakenPointsContract.FinishAction.Send(new FinishActionInput
+        if (CheckPointsContract())
         {
-            ActionType = ActionType.CommitLimitOrder,
-            ActionDetail = new ActionDetail
+            State.AwakenPointsContract.FinishAction.Send(new FinishActionInput
             {
-                Address = Context.Sender,
-                AmountA = input.AmountIn,
-                AmountB = realAmountOut,
-                SymbolA = input.SymbolIn,
-                SymbolB = input.SymbolOut
-            }
-        });
+                ActionType = ActionType.CommitLimitOrder,
+                ActionDetail = new ActionDetail
+                {
+                    Address = Context.Sender,
+                    AmountA = input.AmountIn,
+                    AmountB = realAmountOut,
+                    SymbolA = input.SymbolIn,
+                    SymbolB = input.SymbolOut
+                }
+            });
+        }
         return new Empty();
     }
 
@@ -431,18 +434,21 @@ public partial class AwakenOrderContract : AwakenOrderContractContainer.AwakenOr
                 SymbolOut = orderBook.SymbolOut,
                 TotalFee = labsFee
             });
-            State.AwakenPointsContract.FinishAction.Send(new FinishActionInput
+            if (CheckPointsContract())
             {
-                ActionType = ActionType.LimitOrderFilled,
-                ActionDetail = new ActionDetail
+                State.AwakenPointsContract.FinishAction.Send(new FinishActionInput
                 {
-                    Address = userLimitOrder.Maker,
-                    AmountA = amountIn,
-                    AmountB = amountOut,
-                    SymbolA = orderBook.SymbolIn,
-                    SymbolB = orderBook.SymbolOut
-                }
-            });
+                    ActionType = ActionType.LimitOrderFilled,
+                    ActionDetail = new ActionDetail
+                    {
+                        Address = userLimitOrder.Maker,
+                        AmountA = amountIn,
+                        AmountB = amountOut,
+                        SymbolA = orderBook.SymbolIn,
+                        SymbolB = orderBook.SymbolOut
+                    }
+                });
+            }
             if (userLimitOrder.AmountInFilled == userLimitOrder.AmountIn || userLimitOrder.AmountOutFilled == userLimitOrder.AmountOut)
             {
                 orderNeedRemoveCount++;

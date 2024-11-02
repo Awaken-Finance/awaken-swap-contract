@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ContractCode Include="..\..\protobuf\mock_points_contract.proto">
+            <Link>Protobuf\Proto\mock_points_contract.proto</Link>
+        </ContractCode>
+
+        <ContractReference Include="..\..\protobuf\acs12.proto">
+            <Link>Protobuf\Proto\reference\acs12.proto</Link>
+        </ContractReference>
+    </ItemGroup>
+
+</Project>

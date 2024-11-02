@@ -36,6 +36,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Awaken.Contracts.Order", "c
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Awaken.Contracts.Points", "contract\Awaken.Contracts.Points\Awaken.Contracts.Points.csproj", "{3C1486A1-A19E-4FC2-A268-DE17C680D949}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Awaken.Contracts.MockOracleContract", "test\Awaken.Contracts.MockOracleContract\Awaken.Contracts.MockOracleContract.csproj", "{BB8B9999-A489-4A24-8E1C-3020A3D17C23}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Awaken.Contracts.MockPointsContract", "test\Awaken.Contracts.MockPointsContract\Awaken.Contracts.MockPointsContract.csproj", "{B07F66FE-5CA0-4360-8B44-4AAC8FFAFA57}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -93,6 +97,14 @@ Global
 		{3C1486A1-A19E-4FC2-A268-DE17C680D949}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3C1486A1-A19E-4FC2-A268-DE17C680D949}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3C1486A1-A19E-4FC2-A268-DE17C680D949}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BB8B9999-A489-4A24-8E1C-3020A3D17C23}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BB8B9999-A489-4A24-8E1C-3020A3D17C23}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BB8B9999-A489-4A24-8E1C-3020A3D17C23}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BB8B9999-A489-4A24-8E1C-3020A3D17C23}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B07F66FE-5CA0-4360-8B44-4AAC8FFAFA57}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B07F66FE-5CA0-4360-8B44-4AAC8FFAFA57}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B07F66FE-5CA0-4360-8B44-4AAC8FFAFA57}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B07F66FE-5CA0-4360-8B44-4AAC8FFAFA57}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -110,6 +122,8 @@ Global
 		{CD9954BA-6E34-4769-B10D-A1D5F3309C77} = {DBC47323-E6A2-42A2-A624-CE2EE6139567}
 		{F2E413F9-D984-47AC-8F01-7FD312D905B7} = {5C980166-C987-470D-AEE0-3858A170A903}
 		{3C1486A1-A19E-4FC2-A268-DE17C680D949} = {5C980166-C987-470D-AEE0-3858A170A903}
+		{BB8B9999-A489-4A24-8E1C-3020A3D17C23} = {DBC47323-E6A2-42A2-A624-CE2EE6139567}
+		{B07F66FE-5CA0-4360-8B44-4AAC8FFAFA57} = {DBC47323-E6A2-42A2-A624-CE2EE6139567}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {D7426B41-E959-40E4-9ED8-ED8D9C50F133}

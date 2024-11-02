@@ -16,7 +16,10 @@ using AElf.Kernel.Blockchain.Application;
 using AElf.Kernel.Token;
 using AElf.Standards.ACS0;
 using AElf.Standards.ACS3;
+using Awaken.Contracts.MockOracleContract;
+using Awaken.Contracts.MockPointsContract;
 using Awaken.Contracts.Order;
+using Awaken.Contracts.Points;
 using Awaken.Contracts.Swap;
 using Awaken.Contracts.Token;
 using Google.Protobuf.WellKnownTypes;
@@ -34,6 +37,12 @@ namespace Awaken.Contracts.Hooks
         internal readonly Address AwakenHooksContractAddress;
         
         internal readonly Address AwakenSwapContractAddress;
+        
+        internal readonly Address AwakenPointsContractAddress;
+        
+        internal readonly Address MockPointsContractAddress;
+        
+        internal readonly Address MockOracleContractAddress;
 
         internal readonly Address LpTokenContractAddress;
         
@@ -97,6 +106,14 @@ namespace Awaken.Contracts.Hooks
                     senderKeyPair);
         }
         
+        internal AwakenPointsContractContainer.AwakenPointsContractStub GetPointsContractStub(
+            ECKeyPair senderKeyPair)
+        {
+            return Application.ServiceProvider.GetRequiredService<IContractTesterFactory>()
+                .Create<AwakenPointsContractContainer.AwakenPointsContractStub>(AwakenPointsContractAddress,
+                    senderKeyPair);
+        }
+        
         internal AwakenOrderContractContainer.AwakenOrderContractStub GetOrderContractStub(
             ECKeyPair senderKeyPair)
         {
@@ -145,6 +162,33 @@ namespace Awaken.Contracts.Hooks
                 }));
             OrderContractAddress = Address.Parser.ParseFrom(result.TransactionResult.ReturnValue);
             
+            result = AsyncHelper.RunSync(async () => await ZeroContractStub.DeploySmartContract.SendAsync(
+                new ContractDeploymentInput
+                {
+                    Category = KernelConstants.CodeCoverageRunnerCategory,
+                    Code = ByteString.CopyFrom(
+                        File.ReadAllBytes(typeof(MockPointsContract.MockPointsContract).Assembly.Location))
+                }));
+            MockPointsContractAddress = Address.Parser.ParseFrom(result.TransactionResult.ReturnValue);
+            
+            result = AsyncHelper.RunSync(async () => await ZeroContractStub.DeploySmartContract.SendAsync(
+                new ContractDeploymentInput
+                {
+                    Category = KernelConstants.CodeCoverageRunnerCategory,
+                    Code = ByteString.CopyFrom(
+                        File.ReadAllBytes(typeof(MockOracleContract.MockOracleContract).Assembly.Location))
+                }));
+            MockOracleContractAddress = Address.Parser.ParseFrom(result.TransactionResult.ReturnValue);
+            
+            result = AsyncHelper.RunSync(async () => await ZeroContractStub.DeploySmartContract.SendAsync(
+                new ContractDeploymentInput
+                {
+                    Category = KernelConstants.CodeCoverageRunnerCategory,
+                    Code = ByteString.CopyFrom(
+                        File.ReadAllBytes(typeof(AwakenPointsContract).Assembly.Location))
+                }));
+            AwakenPointsContractAddress = Address.Parser.ParseFrom(result.TransactionResult.ReturnValue);
+            
             blockChainService = Application.ServiceProvider.GetRequiredService<IBlockchainService>();
             
             AsyncHelper.RunSync(() => CreateSeedNftCollection(TokenContractImplStub));
@@ -185,6 +229,12 @@ namespace Awaken.Contracts.Hooks
         
         internal Hooks.AwakenHooksContractContainer.AwakenHooksContractStub LilyHooksStud =>
             GetHooksContractStub(UserLilyKeyPair);
+        
+        internal AwakenPointsContractContainer.AwakenPointsContractStub AdminPointsStud =>
+            GetPointsContractStub(AdminKeyPair);
+        
+        internal AwakenPointsContractContainer.AwakenPointsContractStub TomPointsStud =>
+            GetPointsContractStub(UserTomKeyPair);
         
         internal AwakenOrderContractContainer.AwakenOrderContractStub AdminOrderStud =>
             GetOrderContractStub(AdminKeyPair);

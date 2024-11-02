@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using AElf;
 using AElf.Contracts.MultiToken;
 using AElf.CSharp.Core;
 using AElf.Sdk.CSharp;
@@ -198,5 +199,10 @@ public partial class AwakenOrderContract
         {
             throw new AssertionException($"Failed to parse {realAmountOutStr.Value}");
         }
+    }
+    
+    private bool CheckPointsContract()
+    {
+        return State.AwakenPointsContract.Value != null && !State.AwakenPointsContract.Value.Value.IsNullOrEmpty();
     }
 }
