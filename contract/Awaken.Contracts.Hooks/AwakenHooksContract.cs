@@ -120,7 +120,7 @@ public partial class AwakenHooksContract : AwakenHooksContractContainer.AwakenHo
 
     private void FinishSwapAction(string symbolIn, long amountIn, string symbolOut, long amountOut)
     {
-        if (CheckPointsContract())
+        if (!CheckPointsContract())
         {
             return;
         }

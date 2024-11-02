@@ -70,12 +70,10 @@ message InitializeInput {
 
 message JoinInput {
   string domain = 1;
-  aelf.Address registrant = 2;
 }
 
 message AcceptReferralInput {
   aelf.Address referrer = 1;
-  aelf.Address invitee = 2;
 }
 
 message BatchSettleInput {

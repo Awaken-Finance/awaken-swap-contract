@@ -32,4 +32,9 @@ public partial class AwakenPointsContract
         }
         return result;
     }
+    
+    private void CheckPointsContract()
+    {
+        Assert(IsAddressValid(State.PointsContract.Value) && IsHashValid(State.PointsContractDAppId.Value), "Points contract is not configured.");
+    }
 }

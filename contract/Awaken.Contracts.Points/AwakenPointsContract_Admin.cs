@@ -75,7 +75,7 @@ public partial class AwakenPointsContract
         Assert(input != null && IsStringValid(input.Alias), "Invalid input.");
         CheckAdminPermission();
 
-        if (State.OfficialDomainAlias.Value == input!.Alias)
+        if (State.OfficialDomainAlias.Value == input.Alias)
         {
             return new Empty();
         }

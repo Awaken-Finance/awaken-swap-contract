@@ -19,4 +19,20 @@ public class MockPointsContract : MockPointsContractContainer.MockPointsContract
     {
         return new Empty();
     }
+
+    public override Empty BatchSettle(BatchSettleInput input)
+    {
+        return new Empty();
+    }
+
+    public override GetDappInformationOutput GetDappInformation(GetDappInformationInput input)
+    {
+        return new GetDappInformationOutput()
+        {
+            DappInfo = new DappInfo
+            {
+                OfficialDomain = "XXX"
+            }
+        };
+    }
 }

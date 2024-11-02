@@ -14,19 +14,64 @@ service MockPointsContract {
   // Initialize.
   rpc Join(JoinInput) returns (google.protobuf.Empty) {}
   rpc Settle(SettleInput) returns (google.protobuf.Empty) {}
+  rpc BatchSettle(BatchSettleInput) returns (google.protobuf.Empty) {}
+
+  rpc GetDappInformation(GetDappInformationInput) returns (GetDappInformationOutput) {option (aelf.is_view) = true;}
+
   rpc AcceptReferral (AcceptReferralInput) returns (google.protobuf.Empty) {}
 }
-
 message JoinInput {
   aelf.Hash dapp_id = 1;
   string domain = 2; // 
   aelf.Address registrant = 3;
 }
 
+message DappInfo {
+  aelf.Address dapp_admin = 1;
+  string official_domain = 2;
+  PointsRuleList dapps_point_rules = 3;
+  aelf.Address dapp_contract_address = 4;
+}
+
+message PointsRuleList {
+  repeated PointsRule points_rules = 1;
+}
+
+message PointsRule {
+  string action_name = 1;
+  string point_name = 2;
+  int64 user_points = 3;
+  int64 kol_points_percent = 4;
+  int64 inviter_points_percent = 5;
+  bool enable_proportional_calculation = 6;
+}
+
 message SettleInput {
   aelf.Address user_address = 1;
   string action_name = 2;
   aelf.Hash dapp_id = 3;
+  int64 user_points = 4;
+  aelf.BigIntValue user_points_value = 5;
+}
+
+message BatchSettleInput {
+  string action_name = 1;
+  aelf.Hash dapp_id = 2;
+  repeated UserPoints user_points_list = 3;
+}
+
+message UserPoints {
+  aelf.Address user_address = 1;
+  int64 user_points = 2;
+  aelf.BigIntValue user_points_value = 3;
+}
+
+message GetDappInformationInput {
+  aelf.Hash dapp_id = 1;
+}
+
+message GetDappInformationOutput {
+  DappInfo dapp_info = 1;
 }
 
 message AcceptReferralInput {

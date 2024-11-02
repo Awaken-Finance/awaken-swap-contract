@@ -15,6 +15,7 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
     public override Empty Join(JoinInput input)
     {
         Assert(input != null && IsStringValid(input.Domain), "Invalid input.");
+        CheckPointsContract();
         Assert(!State.JoinRecord[Context.Sender], "Already joined.");
 
         JoinPointsContract(input.Domain);
@@ -24,8 +25,9 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
 
     public override Empty BatchSettle(BatchSettleInput input)
     {
-        CheckSettleAdminPermission();
         Assert(input.UserPointsList != null && input.UserPointsList.Count > 0, "Invalid input.");
+        CheckSettleAdminPermission();
+        CheckPointsContract();
         var userPointsList = new List<global::Points.Contracts.Point.UserPoints>();
         foreach (var userPoints in input.UserPointsList)
         {
@@ -49,6 +51,7 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
     public override Empty AcceptReferral(AcceptReferralInput input)
     {
         Assert(input != null, "Invalid input.");
+        CheckPointsContract();
         Assert(IsAddressValid(input.Referrer) && State.JoinRecord[input.Referrer], "Invalid referrer.");
         Assert(!State.JoinRecord[Context.Sender], "Already joined.");
         
@@ -73,11 +76,6 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
     private void JoinPointsContract(string domain, Address registrant = null)
     {
         registrant ??= Context.Sender;
-        if (!IsHashValid(State.PointsContractDAppId.Value) || State.PointsContract.Value == null)
-        {
-            return;
-        }
-
         if (State.JoinRecord[registrant]) return;
 
         if (domain == null || domain == State.OfficialDomainAlias.Value)
@@ -116,6 +114,7 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
         {
             Assert(Context.Sender == State.HooksContract.Value, "No permission");
         }
+        CheckPointsContract();
 
         var configActionName = input.ActionType.ToString();
         var pointsRewardConfig = State.PointsRewardConfig[input.ActionType.ToString()];
@@ -220,5 +219,4 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
         }
         return value;
     }
-    
 }

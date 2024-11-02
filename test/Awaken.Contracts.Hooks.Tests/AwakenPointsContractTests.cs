@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using AElf;
 using AElf.Types;
@@ -188,6 +189,106 @@ public partial class AwakenHooksContractTests
         admin.ShouldBe(UserTomAddress);
     }
 
+    [Fact]
+    public async Task JoinTest()
+    {
+        await InitializePointContract();
+        var result = await AdminPointsStud.Join.SendWithExceptionAsync(new JoinInput
+        {
+            Domain = "",
+        });
+        result.TransactionResult.Error.ShouldContain("Invalid input.");
+        result = await AdminPointsStud.Join.SendWithExceptionAsync(new JoinInput
+        {
+            Domain = "AAA",
+        });
+        result.TransactionResult.Error.ShouldContain("Points contract is not configured.");
+        
+        await AdminPointsStud.SetPointsContractDAppId.SendAsync(_pointsContractDAppId);
+        result = await AdminPointsStud.Join.SendAsync(new JoinInput
+        {
+            Domain = "AAA"
+        });
+        var joinedEvent = result.TransactionResult.Logs.First(o => o.Name == nameof(Joined));
+        var joined = Joined.Parser.ParseFrom(joinedEvent.NonIndexed);
+        joined.Domain.ShouldBe("AAA");
+        joined.Registrant.ShouldBe(AdminAddress);
+        
+        result = await AdminPointsStud.Join.SendWithExceptionAsync(new JoinInput
+        {
+            Domain = "AAA"
+        });
+        result.TransactionResult.Error.ShouldContain("Already joined.");
+    }
+    
+    [Fact]
+    public async Task AcceptRefererTest()
+    {
+        await InitializePointContract();
+        await AdminPointsStud.SetPointsContractDAppId.SendAsync(_pointsContractDAppId);
+        var result = await AdminPointsStud.AcceptReferral.SendWithExceptionAsync(new AcceptReferralInput()
+        {
+            Referrer = null
+        });
+        result.TransactionResult.Error.ShouldContain("Invalid referrer.");
+        result = await AdminPointsStud.AcceptReferral.SendWithExceptionAsync(new AcceptReferralInput()
+        {
+            Referrer = UserTomAddress
+        });
+        result.TransactionResult.Error.ShouldContain("Invalid referrer.");
+        await TomPointsStud.Join.SendAsync(new JoinInput
+        {
+            Domain = "AAA"
+        });
+        
+        result = await AdminPointsStud.AcceptReferral.SendAsync(new AcceptReferralInput()
+        {
+            Referrer = UserTomAddress
+        });
+       
+        var acceptedEvent = result.TransactionResult.Logs.First(o => o.Name == nameof(ReferralAccepted));
+        var accepted = ReferralAccepted.Parser.ParseFrom(acceptedEvent.NonIndexed);
+        accepted.Referrer.ShouldBe(UserTomAddress);
+        accepted.Invitee.ShouldBe(AdminAddress);
+        
+        result = await AdminPointsStud.AcceptReferral.SendWithExceptionAsync(new AcceptReferralInput()
+        {
+            Referrer = UserTomAddress
+        });
+        result.TransactionResult.Error.ShouldContain("Already joined.");
+    }
+
+    [Fact]
+    public async Task BatchSettleTest()
+    {
+        await InitializePointContract();
+        await AdminPointsStud.SetPointsContractDAppId.SendAsync(_pointsContractDAppId);
+        var result = await AdminPointsStud.BatchSettle.SendWithExceptionAsync(new BatchSettleInput
+        {
+            UserPointsList = {  }
+        });
+        result.TransactionResult.Error.ShouldContain("Invalid input.");
+        result = await TomPointsStud.BatchSettle.SendWithExceptionAsync(new BatchSettleInput
+        {
+            ActionName = "Swap",
+            UserPointsList = { new UserPoints()}
+        });
+        result.TransactionResult.Error.ShouldContain("No permission.");
+        
+        result = await AdminPointsStud.BatchSettle.SendAsync(new BatchSettleInput
+        {
+            ActionName = "Swap",
+            UserPointsList = { new UserPoints
+            {
+                UserAddress = UserTomAddress,
+                UserPoints_ = 100
+            }}
+        });
+        var joinedEvent = result.TransactionResult.Logs.First(o => o.Name == nameof(Joined));
+        var joined = Joined.Parser.ParseFrom(joinedEvent.NonIndexed);
+        joined.Domain.ShouldBe("XXX");
+        joined.Registrant.ShouldBe(UserTomAddress);
+    }
     private async Task InitializePointContract()
     {
         await AdminPointsStud.Initialize.SendAsync(new Points.InitializeInput
