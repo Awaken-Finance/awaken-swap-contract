@@ -12,6 +12,7 @@ public partial class AwakenPointsContract
     public override Empty StartOracleRequest(StartOracleRequestInput input)
     {
         CheckAdminPermission();
+        Assert(State.SubscriptionId.Value > 0, "SubscriptionId not set.");
         State.OracleContract.SendRequest.Send(new SendRequestInput
         {
             SubscriptionId = State.SubscriptionId.Value,
@@ -50,12 +51,7 @@ public partial class AwakenPointsContract
         {
             return;
         }
-        var longList = new LongList
-        {
-            Data = {priceList.Data}
-        };
-
-        var sortedList = longList.Data.ToList().OrderBy(l => l).ToList();
+        var sortedList = priceList.Data.ToList().OrderBy(l => l).ToList();
 
         var from = State.PriceMap[input.TraceId];
         var newPrice = sortedList[sortedList.Count / 2];

@@ -76,8 +76,14 @@
         <ContractStub Include="..\..\protobuf\awaken_order_contract.proto">
             <Link>Protobuf\Proto\awaken_order_contract.proto</Link>
         </ContractStub>
-        <ContractStub Include="..\..\protobuf\awaken_points_contract.proto">
-            <Link>Protobuf\Proto\awaken_points_contract.proto</Link>
+        <ContractStub Include="..\..\protobuf\awaken_points_contract_impl.proto">
+            <Link>Protobuf\Proto\awaken_points_contract_impl.proto</Link>
+        </ContractStub>
+        <ContractStub Include="..\..\protobuf\data_feeds_coordinator_contract.proto">
+            <Link>Protobuf\Proto\data_feeds_coordinator_contract.proto</Link>
+        </ContractStub>
+        <ContractStub Include="..\..\protobuf\coordinator_contract.proto">
+            <Link>Protobuf\Proto\coordinator_contract.proto</Link>
         </ContractStub>
     </ItemGroup>
 

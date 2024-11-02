@@ -106,11 +106,11 @@ namespace Awaken.Contracts.Hooks
                     senderKeyPair);
         }
         
-        internal AwakenPointsContractContainer.AwakenPointsContractStub GetPointsContractStub(
+        internal AwakenPointsContractImplContainer.AwakenPointsContractImplStub GetPointsContractStub(
             ECKeyPair senderKeyPair)
         {
             return Application.ServiceProvider.GetRequiredService<IContractTesterFactory>()
-                .Create<AwakenPointsContractContainer.AwakenPointsContractStub>(AwakenPointsContractAddress,
+                .Create<AwakenPointsContractImplContainer.AwakenPointsContractImplStub>(AwakenPointsContractAddress,
                     senderKeyPair);
         }
         
@@ -230,10 +230,10 @@ namespace Awaken.Contracts.Hooks
         internal Hooks.AwakenHooksContractContainer.AwakenHooksContractStub LilyHooksStud =>
             GetHooksContractStub(UserLilyKeyPair);
         
-        internal AwakenPointsContractContainer.AwakenPointsContractStub AdminPointsStud =>
+        internal AwakenPointsContractImplContainer.AwakenPointsContractImplStub AdminPointsStud =>
             GetPointsContractStub(AdminKeyPair);
         
-        internal AwakenPointsContractContainer.AwakenPointsContractStub TomPointsStud =>
+        internal AwakenPointsContractImplContainer.AwakenPointsContractImplStub TomPointsStud =>
             GetPointsContractStub(UserTomKeyPair);
         
         internal AwakenOrderContractContainer.AwakenOrderContractStub AdminOrderStud =>

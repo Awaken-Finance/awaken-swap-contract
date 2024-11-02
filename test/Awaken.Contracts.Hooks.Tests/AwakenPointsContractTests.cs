@@ -2,7 +2,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using AElf;
 using AElf.Types;
+using AetherLink.Contracts.Consumer;
 using Awaken.Contracts.Points;
+using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using Shouldly;
 using Xunit;
@@ -288,7 +290,247 @@ public partial class AwakenHooksContractTests
         var joined = Joined.Parser.ParseFrom(joinedEvent.NonIndexed);
         joined.Domain.ShouldBe("XXX");
         joined.Registrant.ShouldBe(UserTomAddress);
+        
+        var pointsSettledEvent = result.TransactionResult.Logs.First(o => o.Name == nameof(PointsSettled));
+        var pointsSettled = PointsSettled.Parser.ParseFrom(pointsSettledEvent.NonIndexed);
+        pointsSettled.ActionName.ShouldBe("Swap");
+        pointsSettled.UserAddress.ShouldBe(UserTomAddress);
+        pointsSettled.UserPoints.ShouldBe(100);
     }
+    
+    [Fact]
+    public async Task FinishActionTest()
+    {
+        await InitializePointContract();
+        await AdminPointsStud.SetPointsContractDAppId.SendAsync(_pointsContractDAppId);
+        var result = await AdminPointsStud.FinishAction.SendWithExceptionAsync(new FinishActionInput()
+        );
+        result.TransactionResult.Error.ShouldContain("Invalid input.");
+        result = await AdminPointsStud.FinishAction.SendWithExceptionAsync(new FinishActionInput
+            {
+                ActionType = ActionType.Swap,
+                ActionDetail = new ActionDetail()
+            }
+        );
+        result.TransactionResult.Error.ShouldContain("Invalid input.");
+        
+        result = await AdminPointsStud.FinishAction.SendWithExceptionAsync(new FinishActionInput
+            {
+                ActionType = ActionType.Swap,
+                ActionDetail = new ActionDetail
+                {
+                    SymbolA = "ELF",
+                    SymbolB = "TEST",
+                    AmountA = 100,
+                    AmountB = 100,
+                    Address = UserTomAddress
+                }
+            }
+        );
+        result.TransactionResult.Error.ShouldContain("No FinishAction Permission.");
+
+        await AdminPointsStud.SetOrderContract.SendAsync(AdminAddress);
+        result = await AdminPointsStud.FinishAction.SendAsync(new FinishActionInput
+            {
+                ActionType = ActionType.LimitOrderFilled,
+                ActionDetail = new ActionDetail
+                {
+                    SymbolA = "ELF",
+                    SymbolB = "TEST",
+                    AmountA = 100,
+                    AmountB = 100,
+                    Address = UserTomAddress
+                }
+            }
+        );
+        result.TransactionResult.Logs.FirstOrDefault(o => o.Name == nameof(PointsSettled)).ShouldBeNull();
+
+        await AdminPointsStud.SetPointsRewardConfigList.SendAsync(new SetPointsRewardConfigListInput
+        {
+            Data = { new PointsRewardConfig
+            {
+                FirstRewardAmount = 500,
+                ActionName = "LimitOrderFilled",
+                Proportion = 10000
+            } }
+        });
+        result = await AdminPointsStud.FinishAction.SendAsync(new FinishActionInput
+            {
+                ActionType = ActionType.LimitOrderFilled,
+                ActionDetail = new ActionDetail
+                {
+                    SymbolA = "ELF",
+                    SymbolB = "TEST",
+                    AmountA = 200,
+                    AmountB = 200,
+                    Address = UserTomAddress
+                }
+            }
+        );
+        var pointsSettled = PointsSettled.Parser.ParseFrom(result.TransactionResult.Logs
+            .First(o => o.Name == nameof(PointsSettled)).NonIndexed);
+        pointsSettled.UserPoints.ShouldBe(500);
+        pointsSettled.ActionName.ShouldBe("LimitOrderFilled");
+        pointsSettled.UserAddress.ShouldBe(UserTomAddress);
+
+        await SetPriceMapAsync("ELF", 50000000);
+        result = await AdminPointsStud.FinishAction.SendAsync(new FinishActionInput
+            {
+                ActionType = ActionType.LimitOrderFilled,
+                ActionDetail = new ActionDetail
+                {
+                    SymbolA = "ELF",
+                    SymbolB = "TEST",
+                    AmountA = 200,
+                    AmountB = 200,
+                    Address = UserTomAddress
+                }
+            }
+        );
+        pointsSettled = PointsSettled.Parser.ParseFrom(result.TransactionResult.Logs
+            .First(o => o.Name == nameof(PointsSettled)).NonIndexed);
+        pointsSettled.UserPoints.ShouldBe(100);
+        pointsSettled.ActionName.ShouldBe("LimitOrderFilled");
+        pointsSettled.UserAddress.ShouldBe(UserTomAddress);
+
+        await CreateAndAddLiquidity();
+        result = await AdminPointsStud.FinishAction.SendAsync(new FinishActionInput
+            {
+                ActionType = ActionType.LimitOrderFilled,
+                ActionDetail = new ActionDetail
+                {
+                    SymbolA = "DAI",
+                    SymbolB = "TEST",
+                    AmountA = 200,
+                    AmountB = 200,
+                    Address = UserTomAddress
+                }
+            }
+        );
+        result.TransactionResult.Logs.FirstOrDefault(o => o.Name == nameof(PointsSettled)).ShouldBeNull();
+
+        await AdminPointsStud.SetPricingToken.SendAsync(new SetPricingTokenInput
+        {
+            PricingTokens = { new PricingToken
+            {
+                Symbol = "TEST",
+                FromSymbol = "ELF",
+                FromFeeRate = _feeRate
+            } }
+        });
+        result = await AdminPointsStud.FinishAction.SendAsync(new FinishActionInput
+            {
+                ActionType = ActionType.LimitOrderFilled,
+                ActionDetail = new ActionDetail
+                {
+                    SymbolA = "DAI",
+                    SymbolB = "TEST",
+                    AmountA = 200,
+                    AmountB = 200,
+                    Address = UserTomAddress
+                }
+            }
+        );
+        pointsSettled = PointsSettled.Parser.ParseFrom(result.TransactionResult.Logs
+            .First(o => o.Name == nameof(PointsSettled)).NonIndexed);
+        pointsSettled.UserPoints.ShouldBe(50);
+    }
+
+    [Fact]
+    public async Task StartOracleRequestTest()
+    {
+        var jobStr =
+            "{\"Cron\":\"0 /10  * * ?\",\"DataFeedsJobSpec\":{\"Type\":\"PriceFeeds\",\"CurrencyPair\":\"ELF/USDT\"}}";
+        var specificData = new AetherLink.Contracts.DataFeeds.Coordinator.SpecificData
+        {
+            Data = ByteString.CopyFromUtf8(jobStr),
+            DataVersion = 0
+        }.ToByteString();
+        await InitializePointContract();
+        var result = await TomPointsStud.StartOracleRequest.SendWithExceptionAsync(new StartOracleRequestInput
+        {
+            SpecificData = specificData,
+            TraceId = HashHelper.ComputeFrom("ELF")
+        });
+        result.TransactionResult.Error.ShouldContain("No permission.");
+        
+        result = await AdminPointsStud.StartOracleRequest.SendWithExceptionAsync(new StartOracleRequestInput
+        {
+            SpecificData = specificData,
+            TraceId = HashHelper.ComputeFrom("ELF")
+        });
+        result.TransactionResult.Error.ShouldContain("SubscriptionId not set.");
+
+        await AdminPointsStud.SetSubscriptId.SendAsync(new Int64Value
+        {
+            Value = 1
+        });
+        await AdminPointsStud.StartOracleRequest.SendAsync(new StartOracleRequestInput
+        {
+            SpecificData = specificData,
+            TraceId = HashHelper.ComputeFrom("ELF")
+        });
+    }
+
+    [Fact]
+    public async Task HandleOracleFulfillmentTest()
+    {
+        await InitializePointContract();
+        var result = await AdminPointsStud.HandleOracleFulfillment.SendWithExceptionAsync(new HandleOracleFulfillmentInput());
+        result.TransactionResult.Error.ShouldContain("No permission.");
+        await AdminPointsStud.SetOracleContract.SendAsync(AdminAddress);
+        result = await AdminPointsStud.HandleOracleFulfillment.SendWithExceptionAsync(new HandleOracleFulfillmentInput());
+        result.TransactionResult.Error.ShouldContain("Invalid input request id.");
+        
+        result = await AdminPointsStud.HandleOracleFulfillment.SendWithExceptionAsync(new HandleOracleFulfillmentInput
+        {
+            RequestId = HashHelper.ComputeFrom("1")
+        });
+        result.TransactionResult.Error.ShouldContain("Invalid request type index.");
+        result = await AdminPointsStud.HandleOracleFulfillment.SendWithExceptionAsync(new HandleOracleFulfillmentInput
+        {
+            RequestId = HashHelper.ComputeFrom("1"),
+            RequestTypeIndex = 1
+        });
+        result.TransactionResult.Error.ShouldContain("Invalid input response or err.");
+        result = await AdminPointsStud.HandleOracleFulfillment.SendWithExceptionAsync(new HandleOracleFulfillmentInput
+        {
+            RequestId = HashHelper.ComputeFrom("1"),
+            RequestTypeIndex = 2
+        });
+        result.TransactionResult.Error.ShouldContain("Invalid input response or err.");
+        
+        result = await AdminPointsStud.HandleOracleFulfillment.SendAsync(new HandleOracleFulfillmentInput
+        {
+            RequestId = HashHelper.ComputeFrom("1"),
+            RequestTypeIndex = 1,
+            TraceId = HashHelper.ComputeFrom("ELF"),
+            Response = new LongList()
+            {
+                Data = { 98,99,100,101,102 }
+            }.ToByteString()
+        });
+        var priceUpdated = PriceUpdated.Parser.ParseFrom(result.TransactionResult.Logs.First(o => o.Name == nameof(PriceUpdated)).NonIndexed);
+        priceUpdated.TraceId.ShouldBe(HashHelper.ComputeFrom("ELF"));
+        priceUpdated.From.ShouldBe(0);
+        priceUpdated.To.ShouldBe(100);
+    }
+
+    private async Task SetPriceMapAsync(string symbol, long price)
+    {
+        await AdminPointsStud.SetOracleContract.SendAsync(AdminAddress);
+        await AdminPointsStud.HandleOracleFulfillment.SendAsync(new HandleOracleFulfillmentInput
+        {
+            RequestId = HashHelper.ComputeFrom("1"),
+            RequestTypeIndex = 1,
+            TraceId = HashHelper.ComputeFrom(symbol),
+            Response = new LongList()
+            {
+                Data = { price }
+            }.ToByteString()
+        });
+    }
+
     private async Task InitializePointContract()
     {
         await AdminPointsStud.Initialize.SendAsync(new Points.InitializeInput

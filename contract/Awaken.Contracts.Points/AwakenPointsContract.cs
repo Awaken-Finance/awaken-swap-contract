@@ -25,7 +25,7 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
 
     public override Empty BatchSettle(BatchSettleInput input)
     {
-        Assert(input.UserPointsList != null && input.UserPointsList.Count > 0, "Invalid input.");
+        Assert(input?.UserPointsList != null && input.UserPointsList.Count > 0, "Invalid input.");
         CheckSettleAdminPermission();
         CheckPointsContract();
         var userPointsList = new List<global::Points.Contracts.Point.UserPoints>();
@@ -35,7 +35,13 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
             userPointsList.Add(new global::Points.Contracts.Point.UserPoints
             {
                 UserAddress = userPoints.UserAddress,
-                UserPointsValue = userPoints.UserPointsValue
+                UserPoints_ = userPoints.UserPoints_,
+            });
+            Context.Fire(new PointsSettled
+            {
+                ActionName = input.ActionName,
+                UserAddress = userPoints.UserAddress,
+                UserPoints = userPoints.UserPoints_
             });
         }
 
@@ -108,11 +114,11 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
         Assert(IsStringValid(input.ActionDetail.SymbolA) && IsStringValid(input.ActionDetail.SymbolB), "Invalid input.");
         if (input.ActionType == ActionType.CommitLimitOrder || input.ActionType == ActionType.LimitOrderFilled)
         {
-            Assert(Context.Sender == State.OrderContractAddress.Value, "No permission");
+            Assert(Context.Sender == State.OrderContractAddress.Value, "No FinishAction Permission.");
         }
         else if (input.ActionType == ActionType.Swap || input.ActionType == ActionType.AddLiquidity)
         {
-            Assert(Context.Sender == State.HooksContract.Value, "No permission");
+            Assert(Context.Sender == State.HooksContract.Value, "No FinishAction Permission.");
         }
         CheckPointsContract();
 
@@ -147,7 +153,13 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
                     DappId = State.PointsContractDAppId.Value,
                     ActionName = configActionName,
                     UserAddress = input.ActionDetail.Address,
-                    UserPoints = pointsRewardConfig.FirstRewardAmount
+                    UserPoints = pointsAmount
+                });
+                Context.Fire(new PointsSettled
+                {
+                    ActionName = configActionName,
+                    UserAddress = input.ActionDetail.Address,
+                    UserPoints = pointsAmount
                 });
             }
         }
@@ -161,7 +173,13 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
                 UserAddress = input.ActionDetail.Address,
                 UserPoints = pointsRewardConfig.FirstRewardAmount
             });
-            State.DisposablePointsSettleRecord[Context.Sender][configActionName] = true;
+            State.DisposablePointsSettleRecord[input.ActionDetail.Address][configActionName] = true;
+            Context.Fire(new PointsSettled
+            {
+                ActionName = configActionName,
+                UserAddress = input.ActionDetail.Address,
+                UserPoints = pointsRewardConfig.FirstRewardAmount
+            });
         }
 
         return new Empty();
@@ -202,7 +220,7 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
                 Symbol = pricingToken.FromSymbol
             });
             var priceStr = new BigIntValue(relativePrice).Mul(fromSymbolPrice).Div(IntPow(10, fromTokenInfo.Decimals)).Value;
-            if (long.TryParse(priceStr, out price))
+            if (!long.TryParse(priceStr, out price))
             {
                 throw new AssertionException($"Failed to parse {priceStr}");
             }
@@ -213,7 +231,7 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
             return 0;
         }
         var valueStr = new BigIntValue(amount).Mul(price).Div(IntPow(10, tokenInfo.Decimals)).Value;
-        if (long.TryParse(valueStr, out var value))
+        if (!long.TryParse(valueStr, out var value))
         {
             throw new AssertionException($"Failed to parse {valueStr}");
         }
