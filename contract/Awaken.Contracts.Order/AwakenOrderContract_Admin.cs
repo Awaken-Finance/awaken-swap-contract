@@ -166,6 +166,14 @@ public partial class AwakenOrderContract
         State.LabsFeeTo.Value = input;
         return new Empty();
     }
+    
+    public override Empty SetAwakenPointsContract(Address input)
+    {
+        AssertSenderIsAdmin();
+        Assert(!input.Value.IsNullOrEmpty(), "Invalid input.");
+        State.AwakenPointsContract.Value = input;
+        return new Empty();
+    }
 
     private void AssertContractInitialized()
     {

@@ -38,6 +38,7 @@ service AwakenOrderContract {
   }
   rpc SetLabsFeeTo (aelf.Address) returns (google.protobuf.Empty) {
   }
+  rpc SetAwakenPointsContract(aelf.Address) returns (google.protobuf.Empty) {}
   // view
 
   rpc GetFillResult (GetFillResultInput) returns (GetFillResultOutput) {
@@ -90,6 +91,9 @@ service AwakenOrderContract {
     option (aelf.is_view) = true;
   }
   rpc GetLabsFeeRate (google.protobuf.Empty) returns (google.protobuf.Int64Value) {
+    option (aelf.is_view) = true;
+  }
+  rpc GetAwakenPointsContract(google.protobuf.Empty) returns (aelf.Address)  {
     option (aelf.is_view) = true;
   }
 }

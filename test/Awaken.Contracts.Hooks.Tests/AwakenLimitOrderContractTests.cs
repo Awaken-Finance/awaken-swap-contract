@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AElf.Contracts.MultiToken;
 using Awaken.Contracts.Order;
+using Awaken.Contracts.Points;
 using Google.Protobuf.WellKnownTypes;
 using Shouldly;
 using Xunit;
@@ -73,7 +74,21 @@ public partial class AwakenHooksContractTests
         orderBook.UserLimitOrders.Count.ShouldBe(1);
         orderBook.UserLimitOrders[0].OrderId.ShouldBe(1);
 
-        await TomOrderStud.CommitLimitOrder.SendAsync(new CommitLimitOrderInput()
+        await InitializePointContract();
+        await AdminPointsStud.SetPointsContractDAppId.SendAsync(_pointsContractDAppId);
+        await AdminOrderStud.SetAwakenPointsContract.SendAsync(AwakenPointsContractAddress);
+        (await AdminOrderStud.GetAwakenPointsContract.CallAsync(new Empty())).ShouldBe(AwakenPointsContractAddress);
+        await AdminPointsStud.SetPointsRewardConfigList.SendAsync(new SetPointsRewardConfigListInput()
+        {
+            Data = { new PointsRewardConfig
+            {
+                ActionName = ActionType.CommitLimitOrder.ToString(),
+                FirstRewardAmount = 100,
+                Proportion = 10000
+            } }
+        });
+        await SetPriceMapAsync("ELF", 50000000);
+        result = await TomOrderStud.CommitLimitOrder.SendAsync(new CommitLimitOrderInput()
         {
             SymbolIn = "ELF",
             SymbolOut = "TEST",
@@ -81,6 +96,17 @@ public partial class AwakenHooksContractTests
             AmountOut = 300,
             Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 1, 0)))
         });
+        var pointsSettledEvents = result.TransactionResult.Logs.Where(o => o.Name == nameof(PointsSettled)).ToList();
+        pointsSettledEvents.Count.ShouldBe(2);
+        var pointsSettled0 = PointsSettled.Parser.ParseFrom(pointsSettledEvents[0].NonIndexed);
+        pointsSettled0.UserPoints.ShouldBe(50);
+        pointsSettled0.ActionName.ShouldBe(ActionType.CommitLimitOrder.ToString());
+        pointsSettled0.UserAddress.ShouldBe(UserTomAddress);
+        var pointsSettled1 = PointsSettled.Parser.ParseFrom(pointsSettledEvents[1].NonIndexed);
+        pointsSettled1.UserPoints.ShouldBe(100);
+        pointsSettled1.ActionName.ShouldBe(ActionType.CommitLimitOrder.ToString());
+        pointsSettled1.UserAddress.ShouldBe(UserTomAddress);
+        
         priceBook = await TomOrderStud.GetPriceBook.CallAsync(new Int64Value
         {
             Value = 1
@@ -720,6 +746,31 @@ public partial class AwakenHooksContractTests
         
         // order only
         var limitOrderId2 = await UserTomCommitLimitOrder("ELF", "TEST", 100, 150);
+        
+        await InitializePointContract();
+        await AdminPointsStud.SetPointsContractDAppId.SendAsync(_pointsContractDAppId);
+        await AdminHooksStud.SetAwakenPointsContract.SendAsync(AwakenPointsContractAddress);
+        await AdminOrderStud.SetAwakenPointsContract.SendAsync(AwakenPointsContractAddress);
+        await AdminPointsStud.SetPointsRewardConfigList.SendAsync(new SetPointsRewardConfigListInput
+        {
+            Data =
+            {
+                new PointsRewardConfig
+                {
+                    ActionName = ActionType.Swap.ToString(),
+                    FirstRewardAmount = 300,
+                    Proportion = 10000
+                },
+                new PointsRewardConfig
+                {
+                    ActionName = ActionType.LimitOrderFilled.ToString(),
+                    FirstRewardAmount = 400,
+                    Proportion = 10000
+                },
+            }
+        });
+        await SetPriceMapAsync("ELF", 50000000);
+        
         result = await TomHooksStud.SwapExactTokensForTokens.SendAsync(
             new SwapExactTokensForTokensInput
             {
@@ -741,6 +792,25 @@ public partial class AwakenHooksContractTests
         limitOrderFilled.OrderId.ShouldBe(limitOrderId2);
         limitOrderFilled.AmountInFilled.ShouldBe(100);
         limitOrderFilled.AmountOutFilled.ShouldBe(150);
+        
+        var pointsSettledEvents = result.TransactionResult.Logs.Where(o => o.Name == nameof(PointsSettled)).ToList();
+        pointsSettledEvents.Count.ShouldBe(4);
+        var pointsSettled0 = PointsSettled.Parser.ParseFrom(pointsSettledEvents[0].NonIndexed);
+        pointsSettled0.UserPoints.ShouldBe(50);
+        pointsSettled0.ActionName.ShouldBe(ActionType.LimitOrderFilled.ToString());
+        pointsSettled0.UserAddress.ShouldBe(UserTomAddress);
+        var pointsSettled1 = PointsSettled.Parser.ParseFrom(pointsSettledEvents[1].NonIndexed);
+        pointsSettled1.UserPoints.ShouldBe(400);
+        pointsSettled1.ActionName.ShouldBe(ActionType.LimitOrderFilled.ToString());
+        pointsSettled1.UserAddress.ShouldBe(UserTomAddress);
+        var pointsSettled2 = PointsSettled.Parser.ParseFrom(pointsSettledEvents[2].NonIndexed);
+        pointsSettled2.UserPoints.ShouldBe(50);
+        pointsSettled2.ActionName.ShouldBe(ActionType.Swap.ToString());
+        pointsSettled2.UserAddress.ShouldBe(UserTomAddress);
+        var pointsSettled3 = PointsSettled.Parser.ParseFrom(pointsSettledEvents[3].NonIndexed);
+        pointsSettled3.UserPoints.ShouldBe(300);
+        pointsSettled3.ActionName.ShouldBe(ActionType.Swap.ToString());
+        pointsSettled3.UserAddress.ShouldBe(UserTomAddress);
         
         // order + pool
         var limitOrderId3 = await UserTomCommitLimitOrder("ELF", "TEST", 100, 150);

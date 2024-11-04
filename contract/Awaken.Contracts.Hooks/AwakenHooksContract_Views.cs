@@ -113,4 +113,9 @@ public partial class AwakenHooksContract
             Value = State.LabsFeeRate.Value
         };
     }
+
+    public override Address GetAwakenPointsContract(Empty input)
+    {
+        return State.AwakenPointsContract.Value;
+    }
 }

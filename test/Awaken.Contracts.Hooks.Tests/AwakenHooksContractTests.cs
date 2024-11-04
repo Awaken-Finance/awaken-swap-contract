@@ -6,6 +6,7 @@ using AElf;
 using AElf.Contracts.MultiToken;
 using AElf.CSharp.Core;
 using AElf.Types;
+using Awaken.Contracts.Points;
 using Awaken.Contracts.Swap;
 using Google.Protobuf.WellKnownTypes;
 using Shouldly;
@@ -314,6 +315,45 @@ public partial class AwakenHooksContractTests : AwakenHooksContractTestBase
         });
         reserves3.Results[0].ReserveA.ShouldBe(amountADesired * 5 / 2);
         reserves3.Results[0].ReserveB.ShouldBe(amountBDesired * 5 / 2);
+        
+        await InitializePointContract();
+        await AdminPointsStud.SetPointsContractDAppId.SendAsync(_pointsContractDAppId);
+        await AdminHooksStud.SetAwakenPointsContract.SendAsync(AwakenPointsContractAddress);
+        (await AdminHooksStud.GetAwakenPointsContract.CallAsync(new Empty())).ShouldBe(AwakenPointsContractAddress);
+        await AdminPointsStud.SetPointsRewardConfigList.SendAsync(new SetPointsRewardConfigListInput()
+        {
+            Data = { new PointsRewardConfig
+            {
+                ActionName = ActionType.AddLiquidity.ToString(),
+                FirstRewardAmount = 100,
+                Proportion = 10000
+            } }
+        });
+        await SetPriceMapAsync("ELF", 50000000);
+        await SetPriceMapAsync("TEST", 25000000);
+
+        result = await TomHooksStud.AddLiquidity.SendAsync(new AddLiquidityInput
+        {
+            AmountADesired = amountADesired,
+            AmountAMin = amountADesired,
+            AmountBDesired = amountBDesired,
+            AmountBMin = amountBDesired,
+            Deadline = Timestamp.FromDateTime(DateTime.UtcNow.Add(new TimeSpan(0, 0, 3))),
+            SymbolA = "ELF",
+            SymbolB = "TEST",
+            To = UserTomAddress,
+            FeeRate = _feeRate
+        });
+        var pointsSettledEvents = result.TransactionResult.Logs.Where(o => o.Name == nameof(PointsSettled)).ToList();
+        pointsSettledEvents.Count.ShouldBe(2);
+        var pointsSettled0 = PointsSettled.Parser.ParseFrom(pointsSettledEvents[0].NonIndexed);
+        pointsSettled0.UserPoints.ShouldBe(100000000);
+        pointsSettled0.ActionName.ShouldBe(ActionType.AddLiquidity.ToString());
+        pointsSettled0.UserAddress.ShouldBe(UserTomAddress);
+        var pointsSettled1 = PointsSettled.Parser.ParseFrom(pointsSettledEvents[1].NonIndexed);
+        pointsSettled1.UserPoints.ShouldBe(100);
+        pointsSettled1.ActionName.ShouldBe(ActionType.AddLiquidity.ToString());
+        pointsSettled1.UserAddress.ShouldBe(UserTomAddress);
     }
 
     [Fact]

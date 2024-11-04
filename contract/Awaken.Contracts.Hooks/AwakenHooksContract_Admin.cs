@@ -74,4 +74,12 @@ public partial class AwakenHooksContract
         State.LabsFeeTo.Value = input;
         return new Empty();
     }
+
+    public override Empty SetAwakenPointsContract(Address input)
+    {
+        CheckAdminPermission();
+        Assert(!input.Value.IsNullOrEmpty(), "Invalid input.");
+        State.AwakenPointsContract.Value = input;
+        return new Empty();
+    }
 }
