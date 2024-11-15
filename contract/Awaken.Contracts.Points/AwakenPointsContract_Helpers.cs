@@ -7,6 +7,8 @@ public partial class AwakenPointsContract
 {
     private const long FeeRateMax = 10000;
     private const int PriceDataFeedsRequestTypeIndex = 1;
+    private const string NFTSeparator = "-";
+    private const string First = "First";
 
     private bool IsAddressValid(Address input)
     {

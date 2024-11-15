@@ -352,7 +352,7 @@ public partial class AwakenHooksContractTests : AwakenHooksContractTestBase
         pointsSettled0.UserAddress.ShouldBe(UserTomAddress);
         var pointsSettled1 = PointsSettled.Parser.ParseFrom(pointsSettledEvents[1].NonIndexed);
         pointsSettled1.UserPoints.ShouldBe(100);
-        pointsSettled1.ActionName.ShouldBe(ActionType.AddLiquidity.ToString());
+        pointsSettled1.ActionName.ShouldBe("First" + ActionType.AddLiquidity);
         pointsSettled1.UserAddress.ShouldBe(UserTomAddress);
     }
 

@@ -104,7 +104,7 @@ public partial class AwakenHooksContractTests
         pointsSettled0.UserAddress.ShouldBe(UserTomAddress);
         var pointsSettled1 = PointsSettled.Parser.ParseFrom(pointsSettledEvents[1].NonIndexed);
         pointsSettled1.UserPoints.ShouldBe(100);
-        pointsSettled1.ActionName.ShouldBe(ActionType.CommitLimitOrder.ToString());
+        pointsSettled1.ActionName.ShouldBe("First" + ActionType.CommitLimitOrder);
         pointsSettled1.UserAddress.ShouldBe(UserTomAddress);
         
         priceBook = await TomOrderStud.GetPriceBook.CallAsync(new Int64Value
@@ -801,7 +801,7 @@ public partial class AwakenHooksContractTests
         pointsSettled0.UserAddress.ShouldBe(UserTomAddress);
         var pointsSettled1 = PointsSettled.Parser.ParseFrom(pointsSettledEvents[1].NonIndexed);
         pointsSettled1.UserPoints.ShouldBe(400);
-        pointsSettled1.ActionName.ShouldBe(ActionType.LimitOrderFilled.ToString());
+        pointsSettled1.ActionName.ShouldBe("First" + ActionType.LimitOrderFilled);
         pointsSettled1.UserAddress.ShouldBe(UserTomAddress);
         var pointsSettled2 = PointsSettled.Parser.ParseFrom(pointsSettledEvents[2].NonIndexed);
         pointsSettled2.UserPoints.ShouldBe(50);
@@ -809,7 +809,7 @@ public partial class AwakenHooksContractTests
         pointsSettled2.UserAddress.ShouldBe(UserTomAddress);
         var pointsSettled3 = PointsSettled.Parser.ParseFrom(pointsSettledEvents[3].NonIndexed);
         pointsSettled3.UserPoints.ShouldBe(300);
-        pointsSettled3.ActionName.ShouldBe(ActionType.Swap.ToString());
+        pointsSettled3.ActionName.ShouldBe("First" + ActionType.Swap.ToString());
         pointsSettled3.UserAddress.ShouldBe(UserTomAddress);
         
         // order + pool

@@ -169,14 +169,14 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
             State.PointsContract.Settle.Send(new SettleInput
             {
                 DappId = State.PointsContractDAppId.Value,
-                ActionName = configActionName,
+                ActionName = First + configActionName,
                 UserAddress = input.ActionDetail.Address,
                 UserPoints = pointsRewardConfig.FirstRewardAmount
             });
             State.DisposablePointsSettleRecord[input.ActionDetail.Address][configActionName] = true;
             Context.Fire(new PointsSettled
             {
-                ActionName = configActionName,
+                ActionName = First + configActionName,
                 UserAddress = input.ActionDetail.Address,
                 UserPoints = pointsRewardConfig.FirstRewardAmount
             });
@@ -187,6 +187,7 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
 
     private long CalculateValue(string symbol, long amount)
     {
+        symbol = symbol.Split(NFTSeparator)[0];
         var symbolHash = HashHelper.ComputeFrom(symbol);
         var price = State.PriceMap[symbolHash];
         var tokenInfo = State.TokenContract.GetTokenInfo.Call(new GetTokenInfoInput

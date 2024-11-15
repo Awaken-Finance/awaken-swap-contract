@@ -370,7 +370,7 @@ public partial class AwakenHooksContractTests
         var pointsSettled = PointsSettled.Parser.ParseFrom(result.TransactionResult.Logs
             .First(o => o.Name == nameof(PointsSettled)).NonIndexed);
         pointsSettled.UserPoints.ShouldBe(500);
-        pointsSettled.ActionName.ShouldBe("LimitOrderFilled");
+        pointsSettled.ActionName.ShouldBe("FirstLimitOrderFilled");
         pointsSettled.UserAddress.ShouldBe(UserTomAddress);
 
         await SetPriceMapAsync("ELF", 50000000);
@@ -440,7 +440,7 @@ public partial class AwakenHooksContractTests
     public async Task StartOracleRequestTest()
     {
         var jobStr =
-            "{\"Cron\":\"0 /10  * * ?\",\"DataFeedsJobSpec\":{\"Type\":\"PriceFeeds\",\"CurrencyPair\":\"ELF/USDT\"}}";
+            "{\"Cron\":\"0 */10 * * * ?\",\"DataFeedsJobSpec\":{\"Type\":\"PriceFeeds\",\"CurrencyPair\":\"SGR/USD\"}}";
         var specificData = new AetherLink.Contracts.DataFeeds.Coordinator.SpecificData
         {
             Data = ByteString.CopyFromUtf8(jobStr),
