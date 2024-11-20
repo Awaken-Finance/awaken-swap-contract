@@ -5,6 +5,16 @@ namespace Awaken.Contracts.Token
 {
     public partial class TokenContract
     {
+        public override WhiteList GetWhiteList(Empty input)
+        {
+            return State.WhiteList.Value;
+        }
+
+        public override Address GetAdmin(Empty input)
+        {
+            return State.Admin.Value;
+        }
+
         public override Balance GetBalance(GetBalanceInput input)
         {
             var owner = input.Owner ?? Context.Sender;

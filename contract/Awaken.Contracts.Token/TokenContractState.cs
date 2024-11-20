@@ -9,7 +9,10 @@ namespace Awaken.Contracts.Token
 
         public SingletonState<Address> Owner { get; set; }
 
-        public MappedState<Address, bool> MinterMap{ get; set; }
+        public SingletonState<Address> Admin { get; set; }
+
+        public SingletonState<WhiteList> WhiteList { get; set; }
+        public MappedState<Address, bool> MinterMap { get; set; }
         public MappedState<string, TokenInfo> TokenInfoMap { get; set; }
 
         /// <summary>

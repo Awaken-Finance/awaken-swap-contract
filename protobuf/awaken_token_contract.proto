@@ -35,13 +35,27 @@ service TokenContract {
     }
     rpc Burn (BurnInput) returns (google.protobuf.Empty) {
     }
-    rpc ResetExternalInfo (ResetExternalInfoInput) returns (google.protobuf.Empty){
+    rpc ResetExternalInfo (ResetExternalInfoInput) returns (google.protobuf.Empty) {
     }
-    rpc AddMinter(aelf.Address) returns (google.protobuf.Empty) {
+    rpc AddMinter (aelf.Address) returns (google.protobuf.Empty) {
     }
-    rpc RemoveMinter(aelf.Address) returns (google.protobuf.Empty) {
+    rpc AddWhiteList (aelf.Address) returns (google.protobuf.Empty) {
     }
+    rpc RemoveWhiteList (aelf.Address) returns (google.protobuf.Empty) {
+    }
+    rpc SetAdmin (aelf.Address) returns (google.protobuf.Empty) {
+    }
+    rpc RemoveMinter (aelf.Address) returns (google.protobuf.Empty) {
+    }
+
+  
     // Views
+    rpc GetWhiteList (google.protobuf.Empty) returns (WhiteList) {
+        option (aelf.is_view) = true;
+    }
+    rpc GetAdmin (google.protobuf.Empty) returns (aelf.Address) {
+        option (aelf.is_view) = true;
+    }
     rpc GetTokenInfo (GetTokenInfoInput) returns (TokenInfo) {
         option (aelf.is_view) = true;
     }
@@ -70,6 +84,10 @@ message TokenInfo {
     bool is_burnable = 7;
     int64 issued = 8;
     ExternalInfo external_info = 9;
+}
+
+message WhiteList {
+    repeated aelf.Address value = 1;
 }
 
 message ExternalInfo {
