@@ -128,6 +128,7 @@ public partial class AwakenPointsContract : AwakenPointsContractImplContainer.Aw
         {
             return new Empty();
         }
+        JoinPointsContract(null, input.ActionDetail.Address);
 
         if (pointsRewardConfig.Proportion > 0)
         {
