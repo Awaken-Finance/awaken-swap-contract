@@ -9,7 +9,7 @@ namespace Awaken.Contracts.Swap
         public override AddLiquidityOutput AddLiquidity(AddLiquidityInput input)
         {
             AssertContractInitialized();
-            Assert(input.Deadline >= Context.CurrentBlockTime, "Expired.");
+            Assert(input.Deadline.Seconds >= Context.CurrentBlockTime.Seconds, "Expired.");
             Assert(input.AmountAMin >= 0 && input.AmountBMin >= 0 && input.AmountADesired > 0 && input.AmountBDesired > 0,
                 "Invalid input amount.");
             var amounts = AddLiquidity(input.SymbolA, input.SymbolB, input.AmountADesired, input.AmountBDesired,
