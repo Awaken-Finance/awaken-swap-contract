@@ -1,0 +1,282 @@
+/* This files is part of the Hello World smart contract example that is included in Boilerplate.
+ * It is only the definition of the contract, implementation is located in the "contract" folder
+ * and tests are located in the "test" folder.
+ *
+ * You can use this as a basic template for new contracts.
+ * 
+ * When building Boilerplate or the contract project located in the "../contract/Awaken.Contracts.Investment/" 
+ * protoc (the protobuf compiler) will be invoked and this file will produce a .c.cs file and .g.cs file, in the 
+ * "../contract/Awaken.Contracts.Investment/Protobuf/Generated/" folder. 
+ */
+
+// the version of the language, use proto3 for contracts
+syntax = "proto3";
+
+// some core imports for aelf chain types
+import "aelf/core.proto";
+import "aelf/options.proto";
+
+// import for using the google.protobuf.Empty type.
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
+// the name of the C# namespace in which the contract code will be,
+// generated code will also be in this namespace.
+option csharp_namespace = "Awaken.Contracts.Investment";
+
+// the contract definition: a gRPC service definition.
+service InvestmentContract {
+
+  // the full name of the C# class that will contain the state (here <namespace>.<state-class-name> format).
+  option (aelf.csharp_state) = "Awaken.Contracts.Investment.InvestmentContractState";
+
+  //   Action
+  rpc Initialize (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+
+  rpc ReBalance (ReBalanceInput) returns (google.protobuf.Empty){}
+
+  rpc SetTool (aelf.Address) returns (google.protobuf.Empty){}
+
+  rpc Harvest (HarvestInput) returns(google.protobuf.Empty) {}
+
+  rpc Withdraw (WithdrawInput) returns (google.protobuf.Empty){}
+
+  rpc WithdrawWithReBalance (WithdrawInput) returns (google.protobuf.Empty){}
+
+  rpc DisableProvider (google.protobuf.Int32Value) returns (google.protobuf.Empty){}
+
+  rpc EnableProvider (google.protobuf.Int32Value) returns (google.protobuf.Empty) {}
+
+  rpc AddProvider (AddProviderInput) returns (google.protobuf.Int32Value) {}
+
+  rpc ChooseProvider (ChooseProviderInput) returns (google.protobuf.Empty) {}
+
+  rpc ChangeReservesRatio (ChangeReservesRatioInput) returns (google.protobuf.Empty) {}
+
+  rpc AddAdmin (aelf.Address) returns (google.protobuf.Empty){}
+
+  rpc RemoveAdmin (aelf.Address) returns (google.protobuf.Empty) {}
+
+  rpc ChangeBeneficiary (aelf.Address) returns (google.protobuf.Empty) {}
+
+  rpc ChangeRouter (ChangeRouterInput) returns (google.protobuf.Empty) {}
+
+  rpc Start (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+
+  rpc EmergencePause (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+
+  rpc EmergenceWithdraw (EmergenceWithdrawInput) returns (google.protobuf.Empty) {}
+
+  rpc AddRouter(aelf.Address) returns(google.protobuf.Empty){}
+  
+  // inline
+  rpc HarvestInternalInline(HarvestInput) returns(google.protobuf.Empty){}
+
+  rpc ChooseProviderInline(ChooseProviderInlineInput) returns (google.protobuf.Empty){
+
+  }
+
+  //  View
+  rpc ProvidersLength(google.protobuf.Empty) returns (google.protobuf.Int32Value){
+    option (aelf.is_view) = true;
+  }
+
+  rpc EarnedCurrent(Token) returns (EarnedCurrentOutput) {
+    option (aelf.is_view) = true;
+  }
+
+  rpc Owner(google.protobuf.Empty) returns(aelf.Address){
+    option(aelf.is_view) = true;
+  }
+
+  rpc IsAdmin(aelf.Address) returns(google.protobuf.BoolValue){
+    option(aelf.is_view) = true;
+  }
+
+  rpc Beneficiary(google.protobuf.Empty) returns(aelf.Address){
+    option(aelf.is_view) = true;
+  }
+
+  rpc Tool(google.protobuf.Empty) returns(aelf.Address){
+    option(aelf.is_view) = true;
+  }
+
+  rpc Frozen(google.protobuf.Empty) returns(google.protobuf.BoolValue){
+    option(aelf.is_view) = true;
+  }
+
+  rpc Deposits(DepositViewInput) returns(google.protobuf.Int64Value){
+    option(aelf.is_view) = true;
+  }
+
+  rpc ReservesRatios(google.protobuf.StringValue) returns(aelf.BigIntValue){
+    option(aelf.is_view) = true;
+  }
+
+  rpc ChosenProviders(google.protobuf.StringValue) returns(google.protobuf.Int32Value){
+    option(aelf.is_view) = true;
+  }
+
+  rpc Providers(google.protobuf.Int32Value) returns(Provider){
+    option(aelf.is_view) = true;
+  }
+
+  rpc Routers(google.protobuf.Int32Value) returns(aelf.Address){
+    option(aelf.is_view) = true;
+  }
+
+  rpc RouterId(aelf.Address) returns(google.protobuf.Int32Value){
+    option(aelf.is_view) = true;
+  }
+}
+
+//struct
+message Provider{
+  aelf.Address vault = 1;
+  string token_symbol = 2;
+  bool enable = 3;
+  aelf.BigIntValue accumulate_profit = 4;
+}
+
+message Providers{
+  repeated Provider provider = 1;
+}
+
+message Routers{
+  repeated aelf.Address router = 1;
+}
+
+// Input
+message DepositViewInput{
+  string token = 1;
+  aelf.Address router = 2;
+}
+
+message ChooseProviderInlineInput{
+  aelf.Address oldProviderVault = 1;
+  aelf.Address newProviderVault = 2;
+  string token = 3;
+}
+
+message Token {
+  string token_symbol = 1;
+}
+
+message ReBalanceInput{
+  string token_symbol = 1;
+  aelf.Address router = 2;
+}
+
+message HarvestInput{
+  string token_symbol = 1;
+}
+
+message WithdrawInput{
+  string token_symbol = 1;
+  int64 amount = 2;
+}
+
+message AddProviderInput{
+  string token_symbol = 1;
+  aelf.Address vault_address = 2;
+}
+
+message ChooseProviderInput{
+  string token_symbol = 1;
+  int32 provider_id = 2;
+}
+
+message ChangeReservesRatioInput{
+  string token_symbol = 1;
+  int64 reserves_ratio = 2;
+}
+
+message ChangeRouterInput{
+  aelf.Address old_router = 1;
+  aelf.Address new_router = 2;
+}
+
+message EmergenceWithdrawInput{
+  string token_symbol = 1;
+  int32  provider_id = 2;
+  int64 amount = 3;
+  aelf.Address to = 4;
+}
+
+// Output
+message EarnedCurrentOutput{
+  repeated string tokens = 1;
+  repeated aelf.BigIntValue amounts = 2;
+}
+
+// Event
+message AdminAdded{
+  option (aelf.is_event) = true;
+  aelf.Address admin = 1;
+}
+
+message AdminRemoved{
+  option (aelf.is_event) = true;
+  aelf.Address admin = 1;
+}
+
+message ProviderAdded{
+  option (aelf.is_event) = true;
+  string token_symbol = 1;
+  aelf.Address provider = 2;
+  int32 provider_id = 3;
+}
+
+message ProviderSwitched{
+  option (aelf.is_event) = true;
+  string token_symbol = 1;
+  aelf.Address provider = 2;
+  int32 provider_id = 3;
+}
+
+message ReservesRatiosChanged{
+  option (aelf.is_event) = true;
+  string token_symbol = 1;
+  int64 reserves_ratio = 2;
+}
+
+message ProviderDisabled{
+  option (aelf.is_event) = true;
+  int32 provider_id = 1;
+}
+
+message ProviderEnabled{
+  option (aelf.is_event) = true;
+  int32 provider_id = 1;
+}
+
+message ReBalancedReserves{
+  option (aelf.is_event) = true;
+  string token_symbol = 1;
+  aelf.Address router = 2;
+}
+
+message Harvested{
+  option (aelf.is_event) = true;
+  string token_symbol = 1;
+  string profit = 2;
+  int64 profit_amount = 3;
+}
+
+message RouterAdded{
+  option (aelf.is_event) = true;
+  aelf.Address router = 1;
+  int32 index = 2;
+}
+
+message RouterChange{
+  option (aelf.is_event) = true;
+  aelf.Address old_router = 1;
+  aelf.Address new_router = 2;
+}
+
+message RouterRemove{
+  option (aelf.is_event) = true;
+  aelf.Address router = 1;
+  aelf.Address complement = 2;
+}
