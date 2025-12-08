@@ -1,0 +1,255 @@
+syntax = "proto3";
+
+import "aelf/core.proto";
+import "aelf/options.proto";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
+import "acs12.proto";
+import "acs2.proto";
+import "transaction_fee.proto";
+import "authority_info.proto";
+
+option csharp_namespace = "Awaken.Contracts.Token";
+
+service TokenContract {
+    option (aelf.csharp_state) = "Awaken.Contracts.Token.TokenContractState";
+    option (aelf.base) = "acs12.proto";
+    option (aelf.base) = "acs2.proto";
+
+    // Actions
+    rpc Initialize (InitializeInput) returns (google.protobuf.Empty) {
+    }
+    rpc Create (CreateInput) returns (google.protobuf.Empty) {
+    }
+    rpc Issue (IssueInput) returns (google.protobuf.Empty) {
+    }
+    rpc Transfer (TransferInput) returns (google.protobuf.Empty) {
+    }
+    rpc TransferFrom (TransferFromInput) returns (google.protobuf.Empty) {
+    }
+    rpc Approve (ApproveInput) returns (google.protobuf.Empty) {
+    }
+    rpc UnApprove (UnApproveInput) returns (google.protobuf.Empty) {
+    }
+    rpc Burn (BurnInput) returns (google.protobuf.Empty) {
+    }
+    rpc ResetExternalInfo (ResetExternalInfoInput) returns (google.protobuf.Empty) {
+    }
+    rpc AddMinter (aelf.Address) returns (google.protobuf.Empty) {
+    }
+    rpc AddWhiteList (aelf.Address) returns (google.protobuf.Empty) {
+    }
+    rpc RemoveWhiteList (aelf.Address) returns (google.protobuf.Empty) {
+    }
+    rpc SetAdmin (aelf.Address) returns (google.protobuf.Empty) {
+    }
+    rpc RemoveMinter (aelf.Address) returns (google.protobuf.Empty) {
+    }
+
+  
+    // Views
+    rpc GetWhiteList (google.protobuf.Empty) returns (WhiteList) {
+        option (aelf.is_view) = true;
+    }
+    rpc GetAdmin (google.protobuf.Empty) returns (aelf.Address) {
+        option (aelf.is_view) = true;
+    }
+    rpc GetTokenInfo (GetTokenInfoInput) returns (TokenInfo) {
+        option (aelf.is_view) = true;
+    }
+    rpc GetBalance (GetBalanceInput) returns (Balance) {
+        option (aelf.is_view) = true;
+    }
+    rpc GetBalances (GetBalancesInput) returns (Balances) {
+        option (aelf.is_view) = true;
+    }
+    rpc GetAllowance (GetAllowanceInput) returns (Allowance) {
+        option (aelf.is_view) = true;
+    }
+    rpc GetOwner (google.protobuf.Empty) returns (aelf.Address) {
+        option (aelf.is_view) = true;
+    }
+}
+
+// Structs
+message TokenInfo {
+    string symbol = 1;
+    string token_name = 2;
+    int64 supply = 3;
+    int64 total_supply = 4;
+    int32 decimals = 5;
+    aelf.Address issuer = 6;
+    bool is_burnable = 7;
+    int64 issued = 8;
+    ExternalInfo external_info = 9;
+}
+
+message WhiteList {
+    repeated aelf.Address value = 1;
+}
+
+message ExternalInfo {
+    map<string, string> value = 1;
+}
+
+message CallbackInfo {
+    aelf.Address contract_address = 1;
+    string method_name = 2;
+}
+
+message Balance {
+    string symbol = 1;
+    aelf.Address owner = 2;
+    int64 amount = 3;
+}
+
+message Balances {
+    repeated Balance value = 1;
+}
+
+message Allowance {
+    string symbol = 1;
+    aelf.Address owner = 2;
+    aelf.Address spender = 3;
+    int64 amount = 4;
+}
+
+// Inputs
+message InitializeInput {
+    aelf.Address owner = 1;
+}
+
+message CreateInput {
+    string symbol = 1;
+    string token_name = 2;
+    int64 total_supply = 3;
+    int32 decimals = 4;
+    aelf.Address issuer = 5;
+    bool is_burnable = 6;
+    ExternalInfo external_info = 7;
+}
+
+message IssueInput {
+    string symbol = 1;
+    int64 amount = 2;
+    string memo = 3;
+    aelf.Address to = 4;
+}
+
+message TransferInput {
+    aelf.Address to = 1;
+    string symbol = 2;
+    int64 amount = 3;
+    string memo = 4;
+}
+
+message TransferFromInput {
+    aelf.Address from = 1;
+    aelf.Address to = 2;
+    string symbol = 3;
+    int64 amount = 4;
+    string memo = 5;
+}
+
+message ApproveInput {
+    aelf.Address spender = 1;
+    string symbol = 2;
+    int64 amount = 3;
+}
+
+message UnApproveInput {
+    aelf.Address spender = 1;
+    string symbol = 2;
+    int64 amount = 3;
+}
+
+message BurnInput {
+    string symbol = 1;
+    int64 amount = 2;
+}
+
+message GetTokenInfoInput {
+    string symbol = 1;
+}
+
+message GetBalanceInput {
+    string symbol = 1;
+    aelf.Address owner = 2;
+}
+
+message GetBalancesInput {
+    repeated string symbols = 1;
+    aelf.Address owner = 2;
+}
+
+message GetAllowanceInput {
+    string symbol = 1;
+    aelf.Address owner = 2;
+    aelf.Address spender = 3;
+}
+
+message ResetExternalInfoInput {
+    string symbol = 1;
+    ExternalInfo external_info = 2;
+}
+
+// Events
+
+message Transferred {
+    option (aelf.is_event) = true;
+    aelf.Address from = 1 [(aelf.is_indexed) = true];
+    aelf.Address to = 2 [(aelf.is_indexed) = true];
+    string symbol = 3 [(aelf.is_indexed) = true];
+    int64 amount = 4;
+    string memo = 5;
+}
+
+message Approved {
+    option (aelf.is_event) = true;
+    aelf.Address owner = 1 [(aelf.is_indexed) = true];
+    aelf.Address spender = 2 [(aelf.is_indexed) = true];
+    string symbol = 3 [(aelf.is_indexed) = true];
+    int64 amount = 4;
+}
+
+message UnApproved {
+    option (aelf.is_event) = true;
+    aelf.Address owner = 1 [(aelf.is_indexed) = true];
+    aelf.Address spender = 2 [(aelf.is_indexed) = true];
+    string symbol = 3 [(aelf.is_indexed) = true];
+    int64 amount = 4;
+}
+
+message Burned {
+    option (aelf.is_event) = true;
+    aelf.Address burner = 1 [(aelf.is_indexed) = true];
+    string symbol = 2 [(aelf.is_indexed) = true];
+    int64 amount = 3;
+}
+
+message TokenCreated {
+    option (aelf.is_event) = true;
+    string symbol = 1;
+    string token_name = 2;
+    int64 total_supply = 3;
+    int32 decimals = 4;
+    aelf.Address issuer = 5;
+    bool is_burnable = 6;
+    ExternalInfo external_info = 7;
+}
+
+message Issued {
+    option (aelf.is_event) = true;
+    string symbol = 1;
+    int64 amount = 2;
+    string memo = 3;
+    aelf.Address to = 4;
+}
+
+message ExternalInfoChanged {
+    option (aelf.is_event) = true;
+    string symbol = 1;
+    ExternalInfo external_info = 2;
+}
